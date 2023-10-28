@@ -1,4 +1,6 @@
 def incontext_prompt_manager(args, examples):
+    if len(examples) == 0:
+        return ''
     if args.data_name == "rt":
         out = "Please read the following pairs of movie reviews and sentiment:\n"
         for i,example in enumerate(examples):
