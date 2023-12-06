@@ -7,7 +7,8 @@ from datasets import load_dataset
 
 def load_data(data_name:str, lim:int=None)->Tuple['train', 'val', 'test']:
     data_ret = {
-        'rt'     : _load_rotten_tomatoes
+        'rt'        : _load_rotten_tomatoes,
+        'gigaword'  : _load_gigaword,
     }
     return data_ret[data_name](lim)
 
@@ -31,6 +32,22 @@ def _load_rotten_tomatoes( lim:int=None):
     val = [content_map(t, 'Sentiment', mapping) for t in val]
     test = [content_map(t, 'Sentiment', mapping) for t in test]
     return train, val, test
+
+def _load_gigaword(lim:int=None):
+    dataset = load_dataset("rotten_tomatoes")
+    train = list(dataset['train'])[:lim]
+    val   = list(dataset['validation'])[:lim]
+    test  = list(dataset['test'])[:lim]
+
+    train = [change_key(t, 'document', 'Text') for t in train]
+    val = [change_key(t, 'document', 'Text') for t in val]
+    test = [change_key(t, 'document', 'Text') for t in test]
+
+    train = [change_key(t, 'summary', 'Summary') for t in train]
+    val = [change_key(t, 'summary', 'Summary') for t in val]
+    test = [change_key(t, 'summary', 'Summary') for t in test]
+    return train, val, test
+
 
 
 def _create_splits(examples:list, ratio=0.8)->Tuple[list, list]:
