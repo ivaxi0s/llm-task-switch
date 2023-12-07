@@ -1,4 +1,5 @@
 import json
+import re
 
 def evaluate(pred_fpath, ref_data, ref_data_name):
     '''
@@ -19,6 +20,6 @@ def eval_rt(pred_data, ref_data):
     '''
     matches = 0
     for pred, ref in zip(pred_data, ref_data):
-        if pred == ref['Sentiment']:
+        if re.findall("<Sentiment>(.*?)</Sentiment>", pred, re.DOTALL) == ref['Sentiment']:
             matches +=1
     return {'Accuracy':f'{matches/len(pred_data)*100}%'}

@@ -52,6 +52,5 @@ if __name__ == "__main__":
         with open(fname, 'w') as f:
             json.dump(predictions, f)
 
-
     # Evaluate the performance
     print(evaluate(fname, test_data, eval_args.eval_data_name))
