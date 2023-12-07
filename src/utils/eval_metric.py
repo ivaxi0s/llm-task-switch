@@ -1,14 +1,24 @@
+import json
 
-def evaluate(pred_fpath, data, data_name):
+def evaluate(pred_fpath, ref_data, ref_data_name):
     '''
         pred_fpath: contains model predictions as a list (of dict)
-        data: test data with reference labels
-        data_name: specifies the dataset name (influences evaluation metric)
+        ref_data: test data with reference labels
+        ref_data_name: specifies the reference dataset name (influences evaluation metric)
     '''
-    #TODO
+    # load predictions from cache
+    with open(pred_fpath, 'r') as f:
+        pred_data = json.load(f)
+    
+    if ref_data_name == 'rt':
+        return eval_rt(pred_data, ref_data)
 
 def eval_rt(pred_data, ref_data):
     '''
         Accuracy
     '''
-    #TODO
+    matches = 0
+    for pred, ref in zip(pred_data, ref_data):
+        if pred == ref['Sentiment']:
+            matches +=1
+    return {'Accuracy':f'{matches/len(pred_data)*100}%'}

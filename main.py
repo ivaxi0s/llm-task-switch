@@ -51,10 +51,6 @@ if __name__ == "__main__":
         fname = f'{base_path}/predictions.json'
         with open(fname, 'w') as f:
             json.dump(predictions, f)
-    else:
-        # load predictions from cache
-        with open(fname, 'r') as f:
-            predictions = json.load(f)
 
 
     # Evaluate the performance
