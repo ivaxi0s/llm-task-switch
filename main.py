@@ -7,7 +7,7 @@ import json
 from src.tools.args import core_args, eval_args
 from src.tools.tools import set_seeds
 from src.tools.saving import base_path_creator
-from src.data.data_selector import load_data
+from src.data.data_selector import select_data
 from src.utils.template import template
 from src.inference.predict import predict
 from src.utils.eval_metric import evaluate
@@ -31,12 +31,12 @@ if __name__ == "__main__":
         f.write(' '.join(sys.argv)+'\n')
 
     # Load the incontext data
-    incontext_data, _, _ = load_data(eval_args.incontext_data_name)
+    incontext_data, _, _ = select_data(eval_args.incontext_data_name)
     random.shuffle(incontext_data)
     incontext_examples = incontext_data[:eval_args.num_examples]
 
     # Load the eval data
-    test_data = load_data(eval_args.eval_data_name, train=False)
+    test_data = select_data(eval_args.eval_data_name, train=False)
 
     # get model predictions
     fname = f'{base_path}/predictions.json'
