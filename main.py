@@ -31,7 +31,7 @@ if __name__ == "__main__":
         f.write(' '.join(sys.argv)+'\n')
 
     # Load the incontext data
-    incontext_data, _, _ = select_data(eval_args.incontext_data_name)
+    _, incontext_data = select_data(eval_args.incontext_data_name)
     random.shuffle(incontext_data)
     incontext_examples = incontext_data[:eval_args.num_examples]
 
