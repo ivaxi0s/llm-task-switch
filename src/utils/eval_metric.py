@@ -19,7 +19,16 @@ def eval_rt(pred_data, ref_data):
         Accuracy
     '''
     matches = 0
+    failed = 0
     for pred, ref in zip(pred_data, ref_data):
-        if re.findall("<Sentiment>(.*?)</Sentiment>", pred, re.DOTALL) == ref['Sentiment']:
+        pred = pred.lower()
+        pred_sent = re.findall("<sentiment>(.*?)</sentiment>", pred, re.DOTALL)
+        if len(pred_sent) != 1:
+            failed +=1
+            continue
+        pred_sent = pred_sent[0]
+        pred_sent = pred_sent.strip(' ')
+        if pred_sent == ref['Sentiment']:
             matches +=1
-    return {'Accuracy':f'{matches/len(pred_data)*100}%'}
+    print(f'Generation format failed for {failed/len(pred_data)*100}% samples')
+    return {'Accuracy':f'{matches/(len(pred_data)-failed)*100}%'}
