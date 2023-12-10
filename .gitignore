@@ -1,0 +1,12 @@
+# gitingore file
+
+# Commands run by the user
+CMDs/
+
+# Folder to store experiments
+experiments/
+
+.env
+.idea/
+
+*.egg-info/
