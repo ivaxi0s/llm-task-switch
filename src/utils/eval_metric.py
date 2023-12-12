@@ -1,6 +1,7 @@
 import json
 import re
-from datasets import load_metric
+
+import evaluate
 
 
 def evaluate(pred_fpath, ref_data, ref_data_name):
@@ -56,8 +57,11 @@ def eval_rt(pred_data, ref_data):
 def eval_gigaword(pred_data, ref_data):
     """Evaluate gigaword dataset using ROUGE metric"""
 
-    rouge = load_metric("rouge")
+    rouge = evaluate.load("rouge")
+
+    # rouge = load_metric("rouge")
     scores = rouge.compute(
         predictions=pred_data, references=[r["Summary"] for r in ref_data]
     )
+
     return scores

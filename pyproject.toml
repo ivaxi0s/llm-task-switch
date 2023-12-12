@@ -10,6 +10,7 @@ dependencies = [
   "torch",
   "transformers",
   "datasets",
+  "evaluate",      # rouge metric
   "mypy",
   "python-dotenv",
   "rouge_score",
