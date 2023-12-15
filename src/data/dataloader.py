@@ -1,11 +1,13 @@
 import random
 
+from src import SEED
 from tqdm import tqdm
 from copy import deepcopy
-from typing import List, Dict, Tuple
-from datasets import load_dataset
+from typing import List, Dict, Tuple, Any, Generator
+from datasets import load_dataset, DatasetDict
 from dataclasses import dataclass
 from abc import abstractmethod
+import numpy as np
 
 
 def load_data(data_name: str, lim: int = None) -> Tuple["train", "val", "test"]:
@@ -16,26 +18,154 @@ def load_data(data_name: str, lim: int = None) -> Tuple["train", "val", "test"]:
     return data_ret[data_name](lim)
 
 
+class PromptLoader:
+    """Class to load prompts from different datasets
+
+    Each dataset is immediately loaded into cache
+    """
+
+    def __init__(self):
+        self.gw = GigawordDataLoader()
+
+    def load_prompt(self, incontext: str, eval: str, num_examples: int):
+        """Yield prompts from different datasets
+
+        # TODO: add functionality to limit the test size(deterministically)
+        prompt = incontext + eval
+
+        # TODO: if this is implemened as a dataset transform,
+        then this can be cached (tho this will only save around 40s)
+
+        Args:
+            incontext: name of the dataset to load incontext prompts from
+            eval: name of the dataset to load evaluation prompts from
+            num_examples: number of incontext examples to include
+        """
+
+        if eval == "gigaword":
+            eval_set = self.gw
+
+        if incontext == "gigaword":
+            incontext_set = self.gw
+
+        prompts = [
+            (
+                eval_prompt
+                + "\n"
+                + incontext_set.incontext_prompt(num_examples, seed=idx)
+            )
+            for idx, eval_prompt in enumerate(eval_set.eval_prompt())
+        ]
+
+        return prompts
+
+        # for idx, eval_prompt in enumerate(eval_set.eval_prompt()):
+        #     prompt = (
+        #         eval_prompt
+        #         + "\n"
+        #         + incontext_set.incontext_prompt(num_examples, seed=idx)
+        #     )
+
+        #     yield prompt
+
+    def load_testdata(self, eval: str):
+        """Return the test data as a list[str]"""
+        if eval == "gigaword":
+            return self.gw.load_test_reference()
+
+
 @dataclass
 class DataLoader:
     """Abstract class for loading data"""
 
     dataset_name: str
+    _dataset: DatasetDict | None = None
 
-    def load_data(self):
-        dataset = load_dataset(self.dataset_name)
+    @property
+    def dataset(self):
+        if self._dataset is None:
+            self._dataset = load_dataset(self.dataset_name)
+        return self._dataset
 
     @abstractmethod
-    def incontext_prompt_template(self):
+    def incontext_prompt(self, num_examples: int, seed: int = SEED):
         ...
 
     @abstractmethod
-    def eval_prompt_template(self):
+    def eval_prompt(self):
         ...
 
 
 # @dataclass
 # class RottenTomatoesDataLoader(DataLoader):
+
+
+class GigawordDataLoader(DataLoader):
+    """DataLoader for gigaword dataset
+
+    NOTE: DatasetDict is of the form:
+    {train, validation, test} with features: {document, summary}
+    """
+
+    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n"
+
+    def __init__(self):
+        super().__init__(dataset_name="gigaword")
+
+        # Map the training set to incontext prompts
+        self.train = self.dataset["train"]
+        self.train = self.train.map(GigawordDataLoader._prompt)
+
+        # Map the test set to evaluation prompts
+        self.test = self.dataset["test"]
+        self.test = self.test.map(GigawordDataLoader._eval_prompt)
+
+    def load_test_reference(self):
+        """Return the test data as a list[str]"""
+        return self.test["summary"]
+
+    @staticmethod
+    def _prompt(example: dict[str, Any]) -> dict[str, Any]:
+        """Transform a single example to incontext prompt"""
+        return {
+            "prompt": (
+                "article: " + example["document"] + "\nsummary: " + example["summary"]
+            ),
+        }
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, Any]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": "Please summarize the following article.\n"
+            + example["document"],
+        }
+
+    def incontext_prompt(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+        """
+        if num_examples == 0:
+            return ""
+        out = GigawordDataLoader.PROMPT_PREFIX
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
+        #     range(num_examples), keep_in_memory=True
+        # )["prompt"]
+        out = out + "\n".join(examples)
+        return out
+
+    def eval_prompt(self) -> Generator[str, None, None]:
+        """Yields prompt for evaluation examples"""
+
+        for eval_prompt in self.test["eval_prompt"]:
+            yield eval_prompt
 
 
 def _load_rotten_tomatoes(lim: int = None):
@@ -75,7 +205,6 @@ def _load_gigaword(lim: int = None, test_valid_lim: int = None):
     test = [change_key(t, "summary", "Summary") for t in test]
 
     # Save train, val, test datasets for easy re-use
-    
 
     return train, val, test
 

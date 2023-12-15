@@ -17,8 +17,8 @@ class ModelArgs:
         """Parse arguments and return an instance of ModelArgs"""
         commandLineParser = argparse.ArgumentParser(allow_abbrev=False)
         commandLineParser.add_argument(
-            "--model_name", type=str, default="gpt3.5", help="LLM to evaluate"
-        )
+            "--model_name", type=str, default="mistral-7b", help="LLM to evaluate"
+        )  # options: "gpt3.5, mistral-7b"
         commandLineParser.add_argument(
             "--gpu_id", type=int, default=0, help="select specific gpu"
         )
@@ -60,13 +60,13 @@ class EvalArgs:
         commandLineParser.add_argument(
             "--incontext_data_name",
             type=str,
-            default="rt",
+            default="gigaword",
             help="dataset for incontext examples",
         )
         commandLineParser.add_argument(
             "--eval_data_name",
             type=str,
-            default="rt",
+            default="gigaword",
             help="dataset to evaluate performance on",
         )
         commandLineParser.add_argument(

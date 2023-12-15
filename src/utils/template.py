@@ -43,6 +43,6 @@ def eval_template(eval_args, sample):
         )
 
     if eval_args.eval_data_name == "gigaword":
-        out = f"Please summarize the following text.\n <Text>{sample['Text']}</Text>"
+        out = f"Please summarize the following text.\n{sample['Text']}"
 
     return out

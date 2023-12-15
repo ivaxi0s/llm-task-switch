@@ -1,7 +1,7 @@
 import json
 import re
 
-import evaluate
+import evaluate as hf_evl
 
 
 def evaluate(pred_fpath, ref_data, ref_data_name):
@@ -57,11 +57,9 @@ def eval_rt(pred_data, ref_data):
 def eval_gigaword(pred_data, ref_data):
     """Evaluate gigaword dataset using ROUGE metric"""
 
-    rouge = evaluate.load("rouge")
+    rouge = hf_evl.load("rouge")
 
     # rouge = load_metric("rouge")
-    scores = rouge.compute(
-        predictions=pred_data, references=[r["Summary"] for r in ref_data]
-    )
+    scores = rouge.compute(predictions=pred_data, references=ref_data)
 
     return scores
