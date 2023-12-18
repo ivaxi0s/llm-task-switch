@@ -1,4 +1,7 @@
-"""Generate the templates from the prompt and evaluation"""
+"""Generate the templates from the prompt and evaluation
+
+NOTE: This is deprecated. Use PromptLoader instead (from data/dataloader.py)
+"""
 
 
 def template(eval_args, eval_sample, incontext_examples=[]):

@@ -11,6 +11,7 @@ class ModelArgs:
     seed: int
     force_cpu: bool
     force_rerun: bool
+    batchsize: int
 
     @staticmethod
     def argparse() -> "ModelArgs":
@@ -31,6 +32,9 @@ class ModelArgs:
         commandLineParser.add_argument(
             "--force_rerun", action="store_true", help="force rerun"
         )
+        commandLineParser.add_argument(
+            "--batchsize", type=int, default=1, help="batchsize"
+        )
 
         parsedArgs, _ = commandLineParser.parse_known_args()
 
@@ -40,6 +44,7 @@ class ModelArgs:
             seed=parsedArgs.seed,
             force_cpu=parsedArgs.force_cpu,
             force_rerun=parsedArgs.force_rerun,
+            batchsize=parsedArgs.batchsize,
         )
 
 

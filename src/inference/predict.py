@@ -1,3 +1,8 @@
+"""Run predictions based on the model
+
+NOTE: This file is now depracated. Use src/inference/models.py instead
+"""
+
 from openai import OpenAI
 from dotenv import load_dotenv
 

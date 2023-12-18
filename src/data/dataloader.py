@@ -24,16 +24,25 @@ class PromptLoader:
     Each dataset is immediately loaded into cache
     """
 
-    def __init__(self):
-        self.gw = GigawordDataLoader()
+    def __init__(self, incontext: str, eval: str):
+        """Load all the datasets into memory"""
 
-    def load_prompt(self, incontext: str, eval: str, num_examples: int):
-        """Yield prompts from different datasets
+        if eval == "gigaword":
+            self.eval_set = GigawordDataLoader()
+        if incontext == "gigaword":
+            self.incontext_set = GigawordDataLoader()
 
-        # TODO: add functionality to limit the test size(deterministically)
+    def load_prompt(self, num_examples: int):
+        """Return prompts from different datasets
         prompt = incontext + eval
 
-        # TODO: if this is implemened as a dataset transform,
+        The prompts are pre-loaded into memory.
+        This is because not much RAM is required,
+        and the pre-processing is slow.
+
+        % TODO: add functionality to limit the test size(deterministically)
+
+        % TODO: if this is implemened as a dataset transform,
         then this can be cached (tho this will only save around 40s)
 
         Args:
@@ -42,36 +51,23 @@ class PromptLoader:
             num_examples: number of incontext examples to include
         """
 
-        if eval == "gigaword":
-            eval_set = self.gw
-
-        if incontext == "gigaword":
-            incontext_set = self.gw
-
         prompts = [
             (
-                eval_prompt
+                self.incontext_set.incontext_prompt(num_examples, seed=idx)
                 + "\n"
-                + incontext_set.incontext_prompt(num_examples, seed=idx)
+                + eval_prompt
             )
-            for idx, eval_prompt in enumerate(eval_set.eval_prompt())
+            for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())
         ]
 
         return prompts
 
-        # for idx, eval_prompt in enumerate(eval_set.eval_prompt()):
-        #     prompt = (
-        #         eval_prompt
-        #         + "\n"
-        #         + incontext_set.incontext_prompt(num_examples, seed=idx)
-        #     )
+    def load_testdata(self) -> list[str]:
+        """Return the test data reference as a list[str]
 
-        #     yield prompt
-
-    def load_testdata(self, eval: str):
-        """Return the test data as a list[str]"""
-        if eval == "gigaword":
-            return self.gw.load_test_reference()
+        This is used for evaluation
+        """
+        return self.eval_set.load_test_reference()
 
 
 @dataclass

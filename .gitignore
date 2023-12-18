@@ -8,5 +8,6 @@ experiments/
 
 .env
 .idea/
+.archive/
 
 *.egg-info/
