@@ -5,8 +5,46 @@ Evaluating LLM performance for mis-matched prompts
 - [ ] Verify that model performance noticeably improves as the number of in-context examples increase
 - [ ] Verify that the model performance is degraded by the number of out-of-context examples
 
+
+---
+## Code Setup
+
+The entry point for the code is in [`main.py`](main.py). 
+- The args that can be specified can be found in [src/tools/args.py](src/tools/args.py)
+- Models can be found in [src/inference/models.py](src/inference/models.py)
+- Datasets can be found in [src/data/dataloader.py](src/data/dataloader.py)
+
+To run GPT3.5, an openAI API key is required. Specify this in the `.env` file such as:
+
+```.env
+# llm-in-context/.env
+OPENAI_API_KEY=mykey
+```
+
+
 ---
 ## Results
+
+### Mistral-7b
+
+Switching to Mistral-7b because it is cheaper.
+
+1. Evaluation set: Gigaword
+
+![Results for gigaword](results/gigaword.png "Gigaword")
+
+_Performance of Mistral-7b on Gigaword with in-context prompts from Gigaword._
+
+- For < 5 examples, the trend is as expected
+- For > 10 examples, the model performs suprisingly worse
+  - This may be because the generation length increased - we're not sure why though
+
+
+> Performance with 5 in-context examples (BUT with the eval and in-context examples prompts swapped in order(!))
+
+```json
+{'rouge1': 0.0566397674739907, 'rouge2': 0.013867040607940579, 'rougeL': 0.047584838289689686, 'rougeLsum': 0.04845559344467277}
+```
 
 ### Results for incontext examples
 
@@ -39,7 +77,7 @@ Evaluating LLM performance for mis-matched prompts
 | 20  | 1           | 0.190 | 0.250    |
 |     | 2           | 0.053 | 0.086    |
 |     | L           | 0.162 | 0.220    |
-|     | Lsum        | 0.162 | 0.220    |kl
+|     | Lsum        | 0.162 | 0.220    | kl |
 
 ### Attempted Research
 
@@ -79,16 +117,3 @@ Results for in context examples that *are* shuffled each iteration
 
 [Gigaword](https://huggingface.co/datasets/gigaword)
 - ROUGE metric (see the huggingface website for the metric)
-
----
-## Code Setup
-
-To run GPT3.5, an openAI API key is required. Specify this in the `.env` file such as:
-
-```.env
-# llm-in-context/.env
-OPENAI_API_KEY=mykey
-```
-
-
-
