@@ -1,25 +1,24 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-from openai import OpenAI
+import openai 
 from src.tools.tools import get_default_device
 
 HF_MODEL_URLS = {"mistral-7b": "mistralai/Mistral-7B-Instruct-v0.1"}
 
-OPENAI_MODELS = {"gpt3.5": "gpt-3.5-turbo"}
-
+OPENAI_MODELS = {"gpt3.5": "gpt-3.5-turbo", "gpt4": "gpt-4"}
 
 class OpenAIModel:
     """Class wrapper for models that interacts with an API"""
 
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self.client = OpenAI()
+        self.client = openai
 
     def predict_batch(self, prompt_batch: list[str]) -> list[str]:
         """Predict a batch of prompts"""
         msgs = [{"role": "user", "content": prompt} for prompt in prompt_batch]
         responses = [
-            self.client.chat.completions.create(
+            self.client.ChatCompletion.create(
                 model=OPENAI_MODELS[self.model_name], messages=[msg], temperature=0
             )
             for msg in msgs
