@@ -15,7 +15,8 @@ from dotenv import load_dotenv
 from src.data.dataloader import PromptLoader
 
 load_dotenv()
-import os
+# print(os.environ["HF_HOME"])
+
 
 
 if __name__ == "__main__":
@@ -36,7 +37,7 @@ if __name__ == "__main__":
         f.write(" ".join(sys.argv) + "\n")
 
     # Load dataset
-    print("Loading dataset")
+    print("Loading prompt loader")
     pl = PromptLoader(
         eval=eval_args.eval_data_name, incontext=eval_args.incontext_data_name
     )

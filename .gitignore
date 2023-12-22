@@ -9,5 +9,6 @@ experiments/
 .env
 .idea/
 .archive/
+.vscode/
 
 *.egg-info/

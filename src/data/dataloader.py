@@ -29,8 +29,20 @@ class PromptLoader:
 
         if eval == "gigaword":
             self.eval_set = GigawordDataLoader()
-        if incontext == "gigaword":
+        elif eval == "dailymail":
+            self.eval_set = DailymailDataLoader()
+        elif eval == "rotten_tomatoes":
+            self.eval_set = RottenTomatoesDataLoader()
+
+        if incontext == eval:
+            # Prevent having to loading same dataset twice
+            self.incontext_set = self.eval_set
+        elif incontext == "gigaword":
             self.incontext_set = GigawordDataLoader()
+        elif incontext == "dailymail":
+            self.incontext_set = DailymailDataLoader()
+        elif incontext == "rotten_tomatoes":
+            self.incontext_set = RottenTomatoesDataLoader()
 
     def load_prompt(self, num_examples: int):
         """Return prompts from different datasets
@@ -52,11 +64,7 @@ class PromptLoader:
         """
 
         prompts = [
-            (
-                self.incontext_set.incontext_prompt(num_examples, seed=idx)
-                + "\n"
-                + eval_prompt
-            )
+            (self.incontext_set.incontext_prompt(num_examples, seed=idx) + eval_prompt)
             for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())
         ]
 
@@ -80,7 +88,10 @@ class DataLoader:
     @property
     def dataset(self):
         if self._dataset is None:
-            self._dataset = load_dataset(self.dataset_name)
+            if self.dataset_name == "cnn_dailymail":
+                self._dataset = load_dataset(self.dataset_name, "3.0.0")
+            else:
+                self._dataset = load_dataset(self.dataset_name)
         return self._dataset
 
     @abstractmethod
@@ -92,8 +103,85 @@ class DataLoader:
         ...
 
 
-# @dataclass
-# class RottenTomatoesDataLoader(DataLoader):
+@dataclass
+class RottenTomatoesDataLoader(DataLoader):
+    """Dataloader for rotten tomatoes dataset
+
+    NOTE: DatasetDict is of the form:
+    {train, validation, test} with features: {text, label}
+
+    The `labels` are mapped to `sentiments`
+    1 -> positive; 0 -> negative
+    """
+
+    PROMPT_PREFIX = "Please read the following pairs of movie reviews and sentiment:\n"
+
+    def __init__(self):
+        super().__init__(dataset_name="rotten_tomatoes")
+
+        # Map all labels to sentiments
+        self._dataset = self.dataset.map(RottenTomatoesDataLoader._label_to_sentiment)
+
+        # Map the training set to incontext prompts
+        self.train = self.dataset["train"]
+        self.train = self.train.map(RottenTomatoesDataLoader._prompt)
+
+        # Map the test set to evaluation prompts
+        self.test = self.dataset["test"]
+        self.test = self.test.map(RottenTomatoesDataLoader._eval_prompt)
+
+    def load_test_reference(self):
+        """Return the test data as a list[str]"""
+        return self.test["sentiment"]
+
+    @staticmethod
+    def _label_to_sentiment(example: dict[str, Any]) -> dict[str, str]:
+        """Map the label to sentiment"""
+        return {
+            "sentiment": "positive" if example["label"] == 1 else "negative",
+        }
+
+    @staticmethod
+    def _prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to incontext prompt"""
+        return {
+            "prompt": (
+                "review: " + example["text"] + "\nsentiment: " + example["sentiment"]
+            ),
+        }
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": "Please perform a Sentiment Classification task. "
+            "Given the following movie review, assign a sentiment label from ['negative', 'positive']. "
+            "Return only the sentiment label without any other text.\n"
+            + example["text"]
+        }
+
+    def incontext_prompt(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+        """
+        if num_examples == 0:
+            return ""
+        out = RottenTomatoesDataLoader.PROMPT_PREFIX
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        out = out + "\n".join(examples) + "\n"
+        return out
+
+    def eval_prompt(self) -> Generator[str, None, None]:
+        """Yields prompt for evaluation examples"""
+
+        for eval_prompt in self.test["eval_prompt"]:
+            yield eval_prompt
 
 
 class GigawordDataLoader(DataLoader):
@@ -121,7 +209,7 @@ class GigawordDataLoader(DataLoader):
         return self.test["summary"]
 
     @staticmethod
-    def _prompt(example: dict[str, Any]) -> dict[str, Any]:
+    def _prompt(example: dict[str, Any]) -> dict[str, str]:
         """Transform a single example to incontext prompt"""
         return {
             "prompt": (
@@ -130,7 +218,7 @@ class GigawordDataLoader(DataLoader):
         }
 
     @staticmethod
-    def _eval_prompt(example: dict[str, Any]) -> dict[str, Any]:
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
         """Transform a single example to evaluation prompt"""
         return {
             "eval_prompt": "Please summarize the following article.\n"
@@ -154,7 +242,72 @@ class GigawordDataLoader(DataLoader):
         # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
         #     range(num_examples), keep_in_memory=True
         # )["prompt"]
-        out = out + "\n".join(examples)
+        out = out + "\n".join(examples) + "\n"
+        return out
+
+    def eval_prompt(self) -> Generator[str, None, None]:
+        """Yields prompt for evaluation examples"""
+
+        for eval_prompt in self.test["eval_prompt"]:
+            yield eval_prompt
+
+
+class DailymailDataLoader(DataLoader):
+    """DataLoader for dailymail dataset
+
+    NOTE: DatasetDict is of the form:
+    {train, validation, test} with features: {'article', 'highlights', 'id'}
+    """
+
+    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n"
+
+    def __init__(self):
+        super().__init__(dataset_name="cnn_dailymail")
+
+        # Map the training set to incontext prompts
+        self.train = self.dataset["train"]
+        self.train = self.train.map(DailymailDataLoader._prompt)
+
+        # Map the test set to evaluation prompts
+        self.test = self.dataset["test"]
+        self.test = self.test.map(DailymailDataLoader._eval_prompt)
+
+    def load_test_reference(self):
+        """Return the test data reference (answers) as a list[str]"""
+        return self.test["highlights"]
+
+    @staticmethod
+    def _prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to incontext prompt"""
+        return {
+            "prompt": (
+                "article: " + example["article"] + "\nsummary: " + example["highlights"]
+            ),
+        }
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": "Please summarize the following article.\n"
+            + example["article"],
+        }
+
+    def incontext_prompt(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+        """
+        if num_examples == 0:
+            return ""
+        out = DailymailDataLoader.PROMPT_PREFIX
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        out = out + "\n".join(examples) + "\n"
         return out
 
     def eval_prompt(self) -> Generator[str, None, None]:
@@ -183,25 +336,6 @@ def _load_rotten_tomatoes(lim: int = None):
     train = [content_map(t, "Sentiment", mapping) for t in train]
     val = [content_map(t, "Sentiment", mapping) for t in val]
     test = [content_map(t, "Sentiment", mapping) for t in test]
-    return train, val, test
-
-
-def _load_gigaword(lim: int = None, test_valid_lim: int = None):
-    dataset = load_dataset("gigaword")
-    train = list(dataset["train"])[:test_valid_lim]
-    val = list(dataset["validation"])[:test_valid_lim]
-    test = list(dataset["test"])[:lim]
-
-    train = [change_key(t, "document", "Text") for t in train]
-    val = [change_key(t, "document", "Text") for t in val]
-    test = [change_key(t, "document", "Text") for t in test]
-
-    train = [change_key(t, "summary", "Summary") for t in train]
-    val = [change_key(t, "summary", "Summary") for t in val]
-    test = [change_key(t, "summary", "Summary") for t in test]
-
-    # Save train, val, test datasets for easy re-use
-
     return train, val, test
 
 

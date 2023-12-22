@@ -1,11 +1,18 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-import openai 
+import openai
 from src.tools.tools import get_default_device
 
-HF_MODEL_URLS = {"mistral-7b": "mistralai/Mistral-7B-Instruct-v0.1"}
+HF_MODEL_URLS = {
+    "mistral-7b": "mistralai/Mistral-7B-Instruct-v0.1",
+    "llama-7b": "meta-llama/Llama-2-7b-chat-hf",
+}
 
-OPENAI_MODELS = {"gpt3.5": "gpt-3.5-turbo", "gpt4": "gpt-4"}
+OPENAI_MODELS = {
+    "gpt3.5": "gpt-3.5-turbo",
+    "gpt4": "gpt-4",
+}
+
 
 class OpenAIModel:
     """Class wrapper for models that interacts with an API"""
@@ -28,11 +35,16 @@ class OpenAIModel:
 
 class HFModel:
     def __init__(self, device, model_name="mistral-7b"):
-        self.tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_URLS[model_name])
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            HF_MODEL_URLS[model_name], padding_side="left"
+        )
+        # print(self.tokenizer.padding_side)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model = AutoModelForCausalLM.from_pretrained(HF_MODEL_URLS[model_name])
         self.model.to(device)
         self.device = device
+
+        # TODO: check if model outputs input prompt tokens or just the ouptut
 
     def predict_batch(self, prompt_batch: list[str]) -> list[str]:
         """
@@ -58,6 +70,8 @@ class HFModel:
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=200,
+                temperature=0,
+                top_p=1,
             )
 
         # Remove the tokens that were in the prompt
@@ -66,6 +80,7 @@ class HFModel:
         batch_output_text = self.tokenizer.batch_decode(
             output_tokens, skip_special_tokens=True
         )  # NOTE batch decode strips the text by default
+        # breakpoint()
         return batch_output_text
 
     def predict(self, prompt):
