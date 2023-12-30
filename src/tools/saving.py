@@ -21,6 +21,12 @@ def base_path_creator(
         / f"num_examples_{eval_args.num_examples}"
     )
 
+    if eval_args.iterative:
+        output_path = (
+            output_path
+            / "iterative"
+        )
+
     output_path.mkdir(parents=create, exist_ok=True)
 
     return output_path

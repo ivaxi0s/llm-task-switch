@@ -55,13 +55,20 @@ if __name__ == "__main__":
         predictions = []
 
         print("Loading prompts")
-        prompts = pl.load_prompt(num_examples=eval_args.num_examples)
+        if eval_args.iterative:
+            prompts = pl.load_prompt_iterative(num_examples=eval_args.num_examples)
+        else:
+            prompts = pl.load_prompt(num_examples=eval_args.num_examples)
 
+        breakpoint()
         for i in tqdm(range(0, len(prompts), core_args.batchsize)):
             prompt_batch = prompts[i : i + core_args.batchsize]
             # Get the prediction
             if not eval_args.no_predict:
-                predictions.extend(model.predict_batch(prompt_batch))
+                if eval_args.iterative:
+                    predictions.extend(model.predict_batch_iterative(prompt_batch))
+                else:
+                    predictions.extend(model.predict_batch(prompt_batch))
 
         # Save the prompts
         with open(base_path / "prompts.json", "w") as f:

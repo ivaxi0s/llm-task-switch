@@ -57,6 +57,7 @@ class EvalArgs:
     num_examples: int
     no_predict: bool
     test_size: int | None  # Number of examples to evaluate on (if > test set size, use test set size)
+    iterative: bool
 
     @staticmethod
     def argparse() -> "EvalArgs":
@@ -93,6 +94,11 @@ class EvalArgs:
                 "Number of examples to evaluate on (if > test set size, use test set size)"
                 "If None, use the entire test set"
             ),
+        )
+        commandLineParser.add_argument(
+            "--iterative",
+            action="store_true",
+            help="Provide incontext examples iteratively",
         )
 
         parsedArgs, _ = commandLineParser.parse_known_args()

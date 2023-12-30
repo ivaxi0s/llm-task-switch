@@ -70,6 +70,40 @@ class PromptLoader:
 
         return prompts
 
+    def load_prompt_iterative(self, num_examples: int):
+        """Return prompts from different datasets - iterative version of prompts: returns list of lists of dictionary
+        first list iterates through samples in test dataset
+        second list iterates through the user/assistant messages in turn
+        the dictionary has keys
+             'role': which is either 'user' or 'assistant;
+             'content': the message in that turn
+
+        e.g. the list of message for a single sample with a single incontent example will be
+                [
+            {'role': 'user',
+            'content': 'you are a summary system'.\n What is the summary of (1)
+            },
+
+            {'role': 'assistannt',
+            'content' : summary of (1)
+            }
+
+                {'role': user,
+                'content': What is the summary of eval_sample
+            }
+                ]
+        """
+
+        # prompts = [
+        #     (self.incontext_set.incontext_prompt(num_examples, seed=idx) + eval_prompt)
+        #     for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())
+        # ]
+
+        prompts = [self.incontext_set.incontext_prompt_iterative(num_examples, seed=idx) + [{'role':'user', 'content':eval_prompt}]
+                    for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())]
+
+        return prompts
+
     def load_testdata(self) -> list[str]:
         """Return the test data reference as a list[str]
 
@@ -237,12 +271,40 @@ class GigawordDataLoader(DataLoader):
         out = GigawordDataLoader.PROMPT_PREFIX
         rng = np.random.default_rng(seed)
         idxs = rng.choice(len(self.train), num_examples, replace=False)
+
         examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
 
         # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
         #     range(num_examples), keep_in_memory=True
         # )["prompt"]
         out = out + "\n".join(examples) + "\n"
+        return out
+
+    def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+        """
+        if num_examples == 0:
+            return []
+        # out = GigawordDataLoader.PROMPT_PREFIX
+        out = []
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
+        #     range(num_examples), keep_in_memory=True
+        # )["prompt"]
+
+        # out = out + "\n".join(examples) + "\n"
+        for ex in examples:
+            command = "Please summarize the following article.\n"
+            parts = ex.split("\nsummary: ")
+            out.append({'role':'user', 'content':command+parts[0]})
+            out.append({'role':'assistant', 'content':parts[1]})
         return out
 
     def eval_prompt(self) -> Generator[str, None, None]:
