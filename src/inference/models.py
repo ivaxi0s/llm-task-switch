@@ -122,17 +122,21 @@ class HFModel:
         ).strip()
         return output_text
 
-    def predict_batch_iterative(self, prompt_batch: list[str]) -> list[str]:
+    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
         """
             in context examples are passed iteratively
             assume prompt-batch is batch size x number_of_conversation_turns (role specified)
         """
-        #TODO from here
-        prompt_batch = [f"[INST]{prompt}[/INST]" for prompt in prompt_batch]
+        msgs_batches = []
+        for prompts in prompt_batch:
+            msgs = []
+            for turn in prompts:
+                msgs.append({"role": turn["role"], "content": turn["content"]})
+            msgs_batches.append(msgs)
 
-        inputs = self.tokenizer(
-            prompt_batch, padding=True, truncation=True, return_tensors="pt"
-        ).to(self.device)
+        encodeds = self.tokenizer.apply_chat_template(msgs_batches, return_tensors="pt")
+
+        inputs = encodeds.to(self.device)
         # breakpoint()
 
         with torch.no_grad():
@@ -144,14 +148,13 @@ class HFModel:
                 temperature=0,
                 top_p=1,
             )
-
         # Remove the tokens that were in the prompt
-        output_tokens = output[:, inputs["input_ids"].shape[1] :]
+        # output_tokens = output[:, inputs["input_ids"].shape[1] :]
         # Batch decode tokens
         batch_output_text = self.tokenizer.batch_decode(
-            output_tokens, skip_special_tokens=True
+            output, skip_special_tokens=True
         )  # NOTE batch decode strips the text by default
-        # breakpoint()
+        breakpoint()
         return batch_output_text
 
 
