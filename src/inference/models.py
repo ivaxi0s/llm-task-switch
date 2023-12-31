@@ -32,6 +32,22 @@ class OpenAIModel:
         ]
         return [r.choices[0].message.content for r in responses]
 
+    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+        """Predict a batch of prompts"""
+        msgs_batches = []
+        for prompts in prompt_batch:
+            msgs = []
+            for turn in prompts:
+                msgs.append({"role": turn["role"], "content": turn["content"]})
+            msgs_batches.append(msgs)
+
+        responses = [
+            self.client.ChatCompletion.create(
+                model=OPENAI_MODELS[self.model_name], messages=msgs, temperature=0
+            )
+            for msgs in msgs_batches
+        ]
+        return [r.choices[0].message.content for r in responses]
 
 class HFModel:
     def __init__(self, device, model_name="mistral-7b"):

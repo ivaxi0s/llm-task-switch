@@ -108,4 +108,5 @@ class EvalArgs:
             num_examples=parsedArgs.num_examples,
             no_predict=parsedArgs.no_predict,
             test_size=parsedArgs.test_size,
+            iterative=parsedArgs.iterative
         )
