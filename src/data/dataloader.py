@@ -211,6 +211,29 @@ class RottenTomatoesDataLoader(DataLoader):
         out = out + "\n".join(examples) + "\n"
         return out
 
+    def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+        """
+        if num_examples == 0:
+            return []
+        out = []
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        for ex in examples:
+            command =  "Please perform a Sentiment Classification task. "
+            "Given the following movie review, assign a sentiment label from ['negative', 'positive']. "
+            "Return only the sentiment label without any other text.\n"
+            parts = ex.split("\nsentiment: ")
+            out.append({'role':'user', 'content':command+parts[0]})
+            out.append({'role':'assistant', 'content':parts[1]})
+        return out
+
     def eval_prompt(self) -> Generator[str, None, None]:
         """Yields prompt for evaluation examples"""
 
