@@ -126,36 +126,41 @@ class HFModel:
         """
             in context examples are passed iteratively
             assume prompt-batch is batch size x number_of_conversation_turns (role specified)
-        """
-        msgs_batches = []
-        for prompts in prompt_batch:
-            msgs = []
-            for turn in prompts:
-                msgs.append({"role": turn["role"], "content": turn["content"]})
-            msgs_batches.append(msgs)
 
-        encodeds = self.tokenizer.apply_chat_template(msgs_batches, return_tensors="pt")
+            Unfortunately can only handle a batch size of 1
+        """
+        if len(prompt_batch) > 1:
+            raise ValueError("Batch size cannot be bigger than one for iterative template")
+
+        prompts = prompt_batch[0]
+        msgs = []
+        for turn in prompts:
+            msgs.append({"role": turn["role"], "content": turn["content"]})
+
+        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
 
         inputs = encodeds.to(self.device)
         # breakpoint()
 
         with torch.no_grad():
             output = self.model.generate(
-                **inputs,
+                inputs,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=200,
                 temperature=0,
                 top_p=1,
             )
-        # Remove the tokens that were in the prompt
-        # output_tokens = output[:, inputs["input_ids"].shape[1] :]
+
         # Batch decode tokens
-        batch_output_text = self.tokenizer.batch_decode(
+        output_text = self.tokenizer.batch_decode(
             output, skip_special_tokens=True
-        )  # NOTE batch decode strips the text by default
-        breakpoint()
-        return batch_output_text
+        )[0]  # NOTE batch decode strips the text by default
+
+        # remove input text
+        output_text = output_text.split('[/INST] ')[-1]
+        # breakpoint()
+        return [output_text]
 
 
 def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel:
