@@ -158,7 +158,7 @@ class HFModel:
         )[0]  # NOTE batch decode strips the text by default
 
         # remove input text
-        output_text = output_text.split('[/INST] ')[-1]
+        output_text = output_text.split('[/INST]')[-1]
         # breakpoint()
         return [output_text]
 
