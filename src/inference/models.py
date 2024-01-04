@@ -32,6 +32,22 @@ class OpenAIModel:
         ]
         return [r.choices[0].message.content for r in responses]
 
+    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+        """Predict a batch of prompts"""
+        msgs_batches = []
+        for prompts in prompt_batch:
+            msgs = []
+            for turn in prompts:
+                msgs.append({"role": turn["role"], "content": turn["content"]})
+            msgs_batches.append(msgs)
+
+        responses = [
+            self.client.ChatCompletion.create(
+                model=OPENAI_MODELS[self.model_name], messages=msgs, temperature=0
+            )
+            for msgs in msgs_batches
+        ]
+        return [r.choices[0].message.content for r in responses]
 
 class HFModel:
     def __init__(self, device, model_name="mistral-7b"):
@@ -105,6 +121,46 @@ class HFModel:
             output_tokens, skip_special_tokens=True
         ).strip()
         return output_text
+
+    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+        """
+            in context examples are passed iteratively
+            assume prompt-batch is batch size x number_of_conversation_turns (role specified)
+
+            Unfortunately can only handle a batch size of 1
+        """
+        if len(prompt_batch) > 1:
+            raise ValueError("Batch size cannot be bigger than one for iterative template")
+
+        prompts = prompt_batch[0]
+        msgs = []
+        for turn in prompts:
+            msgs.append({"role": turn["role"], "content": turn["content"]})
+
+        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+
+        inputs = encodeds.to(self.device)
+        # breakpoint()
+
+        with torch.no_grad():
+            output = self.model.generate(
+                inputs,
+                do_sample=False,
+                pad_token_id=self.tokenizer.eos_token_id,
+                max_new_tokens=200,
+                temperature=0,
+                top_p=1,
+            )
+
+        # Batch decode tokens
+        output_text = self.tokenizer.batch_decode(
+            output, skip_special_tokens=True
+        )[0]  # NOTE batch decode strips the text by default
+
+        # remove input text
+        output_text = output_text.split('[/INST]')[-1]
+        # breakpoint()
+        return [output_text]
 
 
 def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel:
