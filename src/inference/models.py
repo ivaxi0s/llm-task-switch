@@ -49,6 +49,7 @@ class OpenAIModel:
         ]
         return [r.choices[0].message.content for r in responses]
 
+
 class HFModel:
     def __init__(self, device, model_name="mistral-7b"):
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -59,6 +60,9 @@ class HFModel:
         self.model = AutoModelForCausalLM.from_pretrained(HF_MODEL_URLS[model_name])
         self.model.to(device)
         self.device = device
+
+        self.max_new_tokens = 5800  # Twice the max len of train set summaries
+        print(f"Max new tokens: {self.max_new_tokens}")
 
         # TODO: check if model outputs input prompt tokens or just the ouptut
 
@@ -85,13 +89,18 @@ class HFModel:
                 **inputs,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
-                max_new_tokens=200,
+                max_new_tokens=self.max_new_tokens,
                 temperature=0,
                 top_p=1,
             )
 
         # Remove the tokens that were in the prompt
         output_tokens = output[:, inputs["input_ids"].shape[1] :]
+        # Check if max_new_tokens reached
+        if output_tokens.shape[1] == self.max_new_tokens:
+            num = sum(o != self.tokenizer.eos_token_id for o in output[:, -1])
+            print(f"WARNING: max_new_tokens reached; seqs truncated: {num}")
+
         # Batch decode tokens
         batch_output_text = self.tokenizer.batch_decode(
             output_tokens, skip_special_tokens=True
@@ -110,7 +119,7 @@ class HFModel:
                 attention_mask=inputs["attention_mask"],
                 # top_k=top_k,
                 do_sample=False,
-                max_new_tokens=200,
+                max_new_tokens=self.max_new_tokens,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
         output_tokens = output[0]
@@ -124,13 +133,15 @@ class HFModel:
 
     def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
         """
-            in context examples are passed iteratively
-            assume prompt-batch is batch size x number_of_conversation_turns (role specified)
+        in context examples are passed iteratively
+        assume prompt-batch is batch size x number_of_conversation_turns (role specified)
 
-            Unfortunately can only handle a batch size of 1
+        Unfortunately can only handle a batch size of 1
         """
         if len(prompt_batch) > 1:
-            raise ValueError("Batch size cannot be bigger than one for iterative template")
+            raise ValueError(
+                "Batch size cannot be bigger than one for iterative template"
+            )
 
         prompts = prompt_batch[0]
         msgs = []
@@ -147,18 +158,18 @@ class HFModel:
                 inputs,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
-                max_new_tokens=200,
+                max_new_tokens=self.max_new_tokens,
                 temperature=0,
                 top_p=1,
             )
 
         # Batch decode tokens
-        output_text = self.tokenizer.batch_decode(
-            output, skip_special_tokens=True
-        )[0]  # NOTE batch decode strips the text by default
+        output_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)[
+            0
+        ]  # NOTE batch decode strips the text by default
 
         # remove input text
-        output_text = output_text.split('[/INST]')[-1]
+        output_text = output_text.split("[/INST]")[-1]
         # breakpoint()
         return [output_text]
 

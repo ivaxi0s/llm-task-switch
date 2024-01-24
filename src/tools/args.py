@@ -56,7 +56,7 @@ class EvalArgs:
     eval_data_name: str  # Evaluation dataset
     num_examples: int
     no_predict: bool
-    test_size: int | None  # Number of examples to evaluate on (if > test set size, use test set size)
+    eval_size: int | None  # Number of examples to evaluate on (if > test set size, use test set size)
     iterative: bool
 
     @staticmethod
@@ -87,12 +87,13 @@ class EvalArgs:
             help="Do not predict (and do not save predictions)",
         )
         commandLineParser.add_argument(
-            "--test_size",
+            "--eval_size",
             type=int,
             default=None,
             help=(
-                "Number of examples to evaluate on (if > test set size, use test set size)"
-                "If None, use the entire test set"
+                "Number of examples to evaluate on "
+                "if > test set size, use test set size (with Warning)"
+                "if None, use the entire test set"
             ),
         )
         commandLineParser.add_argument(
@@ -107,6 +108,6 @@ class EvalArgs:
             eval_data_name=parsedArgs.eval_data_name,
             num_examples=parsedArgs.num_examples,
             no_predict=parsedArgs.no_predict,
-            test_size=parsedArgs.test_size,
-            iterative=parsedArgs.iterative
+            eval_size=parsedArgs.eval_size,
+            iterative=parsedArgs.iterative,
         )

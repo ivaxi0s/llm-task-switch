@@ -1,5 +1,9 @@
 # gitingore file
 
+#SLURM jobs
+*.out
+machine.file.*
+
 # Commands run by the user
 CMDs/
 
@@ -12,3 +16,4 @@ experiments/
 .vscode/
 
 *.egg-info/
+.ipynb_checkpoints/

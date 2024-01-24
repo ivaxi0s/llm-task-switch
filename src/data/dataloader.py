@@ -10,14 +10,6 @@ from abc import abstractmethod
 import numpy as np
 
 
-def load_data(data_name: str, lim: int = None) -> Tuple["train", "val", "test"]:
-    data_ret = {
-        "rt": _load_rotten_tomatoes,
-        "gigaword": _load_gigaword,
-    }
-    return data_ret[data_name](lim)
-
-
 class PromptLoader:
     """Class to load prompts from different datasets
 
@@ -48,7 +40,7 @@ class PromptLoader:
         elif incontext == "tweetqa":
             self.incontext_set = TweetQADataLoader()
 
-    def load_prompt(self, num_examples: int):
+    def load_prompt(self, num_examples: int, eval_size: int):
         """Return prompts from different datasets
         prompt = incontext + eval
 
@@ -68,13 +60,18 @@ class PromptLoader:
         """
 
         prompts = [
-            (self.incontext_set.incontext_prompt(num_examples, seed=idx) + eval_prompt)
-            for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())
+            (
+                idx,
+                self.incontext_set.incontext_prompt(num_examples, seed=idx)
+                + eval_prompt,
+            )
+            for idx, eval_prompt in self.eval_set.eval_prompt(eval_size)
         ]
+        eval_idxs, prompts = zip(*prompts)
 
-        return prompts
+        return eval_idxs, prompts
 
-    def load_prompt_iterative(self, num_examples: int):
+    def load_prompt_iterative(self, num_examples: int, eval_size: int):
         """Return prompts from different datasets - iterative version of prompts: returns list of lists of dictionary
         first list iterates through samples in test dataset
         second list iterates through the user/assistant messages in turn
@@ -103,17 +100,28 @@ class PromptLoader:
         #     for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())
         # ]
 
-        prompts = [self.incontext_set.incontext_prompt_iterative(num_examples, seed=idx) + [{'role':'user', 'content':eval_prompt}]
-                    for idx, eval_prompt in enumerate(self.eval_set.eval_prompt())]
+        idxs_prompts = [
+            (
+                idx,  # idx of the sample in the test dataset
+                self.incontext_set.incontext_prompt_iterative(num_examples, seed=idx)
+                + [{"role": "user", "content": eval_prompt}],
+            )
+            for idx, eval_prompt in self.eval_set.eval_prompt(eval_size)
+        ]
+        eval_idxs, prompts = zip(*idxs_prompts)
 
-        return prompts
+        return eval_idxs, prompts
 
-    def load_testdata(self) -> list[str]:
+    def load_testdata(self, eval_idxs) -> list[str]:
         """Return the test data reference as a list[str]
 
         This is used for evaluation
         """
-        return self.eval_set.load_test_reference()
+        references = self.eval_set.load_test_reference()
+        if eval_idxs is None:
+            return references
+        else:
+            return [references[idx] for idx in eval_idxs]
 
 
 @dataclass
@@ -122,6 +130,7 @@ class DataLoader:
 
     dataset_name: str
     _dataset: DatasetDict | None = None
+    test: DatasetDict | None = None
 
     @property
     def dataset(self):
@@ -136,9 +145,30 @@ class DataLoader:
     def incontext_prompt(self, num_examples: int, seed: int = SEED):
         ...
 
-    @abstractmethod
-    def eval_prompt(self):
-        ...
+    def eval_prompt(
+        self, eval_size: int, seed: int = SEED
+    ) -> Generator[str, None, None]:
+        """Yields prompt for evaluation examples
+
+        We sample eval_size examples from the test set
+        """
+
+        if eval_size is None:
+            eval_examples = self.test["eval_prompt"]
+        elif eval_size > 0:
+            if eval_size > len(self.test):
+                print(
+                    f"WARNING: eval_size ({eval_size}) is larger than test set size ({len(self.test)})"
+                )
+                eval_size = len(self.test)
+            rng = np.random.default_rng(seed)
+            idxs = rng.choice(len(self.test), eval_size, replace=False)
+            eval_examples = self.test.select(idxs, keep_in_memory=True)["eval_prompt"]
+        else:
+            raise ValueError(f"eval_size must be None or > 0, got {eval_size}")
+
+        for idx, eval_prompt in enumerate(eval_examples):
+            yield idx, eval_prompt
 
 
 @dataclass
@@ -152,7 +182,9 @@ class RottenTomatoesDataLoader(DataLoader):
     1 -> positive; 0 -> negative
     """
 
-    PROMPT_PREFIX = "Please read the following pairs of movie reviews and sentiment:\n"
+    PROMPT_PREFIX = (
+        "Please read the following pairs of movie reviews and sentiment:\n\n"
+    )
 
     def __init__(self):
         super().__init__(dataset_name="rotten_tomatoes")
@@ -212,7 +244,7 @@ class RottenTomatoesDataLoader(DataLoader):
         idxs = rng.choice(len(self.train), num_examples, replace=False)
         examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
 
-        out = out + "\n".join(examples) + "\n"
+        out = out + "\n".join(examples) + "\n\n"
         return out
 
     def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
@@ -230,19 +262,13 @@ class RottenTomatoesDataLoader(DataLoader):
         examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
 
         for ex in examples:
-            command =  "Please perform a Sentiment Classification task. "
+            command = "Please perform a Sentiment Classification task. "
             "Given the following movie review, assign a sentiment label from ['negative', 'positive']. "
             "Return only the sentiment label without any other text.\n"
             parts = ex.split("\nsentiment: ")
-            out.append({'role':'user', 'content':command+parts[0]})
-            out.append({'role':'assistant', 'content':parts[1]})
+            out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
         return out
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
 
 
 class GigawordDataLoader(DataLoader):
@@ -252,7 +278,7 @@ class GigawordDataLoader(DataLoader):
     {train, validation, test} with features: {document, summary}
     """
 
-    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n"
+    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
         super().__init__(dataset_name="gigaword")
@@ -304,7 +330,7 @@ class GigawordDataLoader(DataLoader):
         # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
         #     range(num_examples), keep_in_memory=True
         # )["prompt"]
-        out = out + "\n".join(examples) + "\n"
+        out = out + "\n".join(examples) + "\n\n"
         return out
 
     def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
@@ -330,15 +356,9 @@ class GigawordDataLoader(DataLoader):
         for ex in examples:
             command = "Please summarize the following article.\n"
             parts = ex.split("\nsummary: ")
-            out.append({'role':'user', 'content':command+parts[0]})
-            out.append({'role':'assistant', 'content':parts[1]})
+            out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
         return out
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
 
 
 class DailymailDataLoader(DataLoader):
@@ -348,7 +368,7 @@ class DailymailDataLoader(DataLoader):
     {train, validation, test} with features: {'article', 'highlights', 'id'}
     """
 
-    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n"
+    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
         super().__init__(dataset_name="cnn_dailymail")
@@ -396,9 +416,9 @@ class DailymailDataLoader(DataLoader):
         idxs = rng.choice(len(self.train), num_examples, replace=False)
         examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
 
-        out = out + "\n".join(examples) + "\n"
+        out = out + "\n".join(examples) + "\n\n"
         return out
-    
+
     def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
         """Returns prompt for incontext examples
 
@@ -416,43 +436,9 @@ class DailymailDataLoader(DataLoader):
         for ex in examples:
             command = "Please summarize the following article.\n"
             parts = ex.split("\nsummary: ")
-            out.append({'role':'user', 'content':command+parts[0]})
-            out.append({'role':'assistant', 'content':parts[1]})
+            out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
         return out
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
-
-
-def _load_rotten_tomatoes(lim: int = None):
-    dataset = load_dataset("rotten_tomatoes")
-    train = list(dataset["train"])[:lim]
-    val = list(dataset["validation"])[:lim]
-    test = list(dataset["test"])[:lim]
-
-    # Modify the keys based on the template tags (see the paper)
-    train = [change_key(t, "text", "Review") for t in train]
-    val = [change_key(t, "text", "Review") for t in val]
-    test = [change_key(t, "text", "Review") for t in test]
-
-    train = [change_key(t, "label", "Sentiment") for t in train]
-    val = [change_key(t, "label", "Sentiment") for t in val]
-    test = [change_key(t, "label", "Sentiment") for t in test]
-
-    mapping = {0: "negative", 1: "positive"}
-    train = [content_map(t, "Sentiment", mapping) for t in train]
-    val = [content_map(t, "Sentiment", mapping) for t in val]
-    test = [content_map(t, "Sentiment", mapping) for t in test]
-    return train, val, test
 
 
 class WikicatDataLoader(DataLoader):
@@ -462,7 +448,7 @@ class WikicatDataLoader(DataLoader):
     {train, validation, test} with features: {document, summary}
     """
 
-    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n"
+    PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
         super().__init__(dataset_name="GEM/wiki_cat_sum")
@@ -484,7 +470,10 @@ class WikicatDataLoader(DataLoader):
         """Transform a single example to incontext prompt"""
         return {
             "prompt": (
-                "article: " + " ".join(example["paragraphs"]) + "\nsummary: " + " ".join(example["summary"]["text"])
+                "article: "
+                + " ".join(example["paragraphs"])
+                + "\nsummary: "
+                + " ".join(example["summary"]["text"])
             ),
         }
 
@@ -514,7 +503,7 @@ class WikicatDataLoader(DataLoader):
         # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
         #     range(num_examples), keep_in_memory=True
         # )["prompt"]
-        out = out + "\n".join(examples) + "\n"
+        out = out + "\n".join(examples) + "\n\n"
         return out
 
     def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
@@ -526,7 +515,7 @@ class WikicatDataLoader(DataLoader):
         """
         if num_examples == 0:
             return []
-        
+
         out = []
         rng = np.random.default_rng(seed)
         idxs = rng.choice(len(self.train), num_examples, replace=False)
@@ -540,22 +529,15 @@ class WikicatDataLoader(DataLoader):
         for ex in examples:
             command = "Please summarize the following article.\n"
             parts = ex.split("\nsummary: ")
-            out.append({'role':'user', 'content':command+parts[0]})
-            out.append({'role':'assistant', 'content':parts[1]})
+            out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
         return out
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
 
 
 class TweetQADataLoader(DataLoader):
-    """DataLoader for TweetQA dataset
-    """
+    """DataLoader for TweetQA dataset"""
 
-    PROMPT_PREFIX = "Please read the following triplet of contexts, questions and answers and summaries:\n"
+    PROMPT_PREFIX = "Please read the following triplet of contexts, questions and answers and summaries:\n\n"
 
     def __init__(self):
         super().__init__(dataset_name="tweet_qa")
@@ -570,14 +552,19 @@ class TweetQADataLoader(DataLoader):
 
     def load_test_reference(self):
         """Return the test data as a list[str]"""
-        return self.test["summary"]
+        return self.test["Answer"]
 
     @staticmethod
     def _prompt(example: dict[str, Any]) -> dict[str, str]:
         """Transform a single example to incontext prompt"""
         return {
             "prompt": (
-                "tweet: "+ example["Tweet"] + "\nquestion: " + example["Question"] + "\nanswer: " + example["Answer"][0]
+                "tweet: "
+                + example["Tweet"]
+                + "\nquestion: "
+                + example["Question"]
+                + "\nanswer: "
+                + example["Answer"][0]
             ),
         }
 
@@ -586,7 +573,7 @@ class TweetQADataLoader(DataLoader):
         """Transform a single example to evaluation prompt"""
         return {
             "eval_prompt": "Read the given tweet and answer the corresponding question.\n"
-            "tweet: "+ example['Tweet']+"\nquestion: " + example["Question"]
+            "tweet: " + example["Tweet"] + "\nquestion: " + example["Question"]
         }
 
     def incontext_prompt(self, num_examples: int, seed: int = SEED):
@@ -607,7 +594,7 @@ class TweetQADataLoader(DataLoader):
         # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
         #     range(num_examples), keep_in_memory=True
         # )["prompt"]
-        out = out + "\n".join(examples) + "\n"
+        out = out + "\n".join(examples) + "\n\n"
         return out
 
     def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
@@ -619,7 +606,7 @@ class TweetQADataLoader(DataLoader):
         """
         if num_examples == 0:
             return []
-        
+
         out = []
         rng = np.random.default_rng(seed)
         idxs = rng.choice(len(self.train), num_examples, replace=False)
@@ -633,63 +620,6 @@ class TweetQADataLoader(DataLoader):
         for ex in examples:
             command = "Read the given tweet and answer the corresponding question.\n"
             parts = ex.split("\nanswer: ")
-            out.append({'role':'user', 'content':command+parts[0]})
-            out.append({'role':'assistant', 'content':parts[1]})
+            out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
         return out
-
-    def eval_prompt(self) -> Generator[str, None, None]:
-        """Yields prompt for evaluation examples"""
-
-        for eval_prompt in self.test["eval_prompt"]:
-            yield eval_prompt
-
-
-
-
-
-def _create_splits(examples: list, ratio=0.8) -> Tuple[list, list]:
-    examples = deepcopy(examples)
-    split_len = int(ratio * len(examples))
-
-    random.seed(1)
-    random.shuffle(examples)
-
-    split_1 = examples[:split_len]
-    split_2 = examples[split_len:]
-    return split_1, split_2
-
-
-def change_key(ex: dict, old_key="content", new_key="text"):
-    """convert key name from the old_key to 'text'"""
-    ex = ex.copy()
-    ex[new_key] = ex.pop(old_key)
-    return ex
-
-
-def content_map(ex: dict, target_key, mapping):
-    ex[target_key] = mapping[ex[target_key]]
-    return ex
-
-
-def _multi_key_to_text(ex: dict, key1: str, key2: str):
-    """concatenate contents of key1 and key2 and map to name text"""
-    ex = ex.copy()
-    ex["text"] = ex.pop(key1) + " " + ex.pop(key2)
-    return ex
-
-
-def _invert_labels(ex: dict):
-    ex = ex.copy()
-    ex["label"] = 1 - ex["label"]
-    return ex
-
-
-def _map_labels(ex: dict, map_dict={-1: 0, 1: 1}):
-    ex = ex.copy()
-    ex["label"] = map_dict[ex["label"]]
-    return ex
-
-
-def _rand_sample(lst, frac):
-    random.Random(4).shuffle(lst)
-    return lst[: int(len(lst) * frac)]

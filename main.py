@@ -5,6 +5,8 @@ from tqdm import tqdm
 import json
 
 MAIN_PATH = Path(os.path.dirname(os.path.realpath(__file__)))
+EVAL_IDXS_FILE = "eval_idxs.json"
+
 
 from src.tools.args import ModelArgs, EvalArgs
 from src.tools.tools import set_seeds
@@ -16,7 +18,6 @@ from src.data.dataloader import PromptLoader
 
 load_dotenv()
 # print(os.environ["HF_HOME"])
-
 
 
 if __name__ == "__main__":
@@ -50,17 +51,31 @@ if __name__ == "__main__":
     # ELSE: run inference using the model
     else:
         # Initialise / load model
+        print(f"Loading model: {core_args.model_name}")
         model = get_model(core_args.model_name, core_args.gpu_id)
 
         predictions = []
 
         print("Loading prompts")
         if eval_args.iterative:
-            prompts = pl.load_prompt_iterative(num_examples=eval_args.num_examples)
+            eval_idxs, prompts = pl.load_prompt_iterative(
+                num_examples=eval_args.num_examples, eval_size=eval_args.eval_size
+            )
         else:
-            prompts = pl.load_prompt(num_examples=eval_args.num_examples)
+            eval_idxs, prompts = pl.load_prompt(
+                num_examples=eval_args.num_examples, eval_size=eval_args.eval_size
+            )
 
+        # Save the prompts
+        with open(base_path / "prompts.json", "w") as f:
+            json.dump(prompts, f)
+        # Save the idxs
+        with open(base_path / EVAL_IDXS_FILE, "w") as f:
+            json.dump(eval_idxs, f)
+
+        # Get predictions on test set
         for i in tqdm(range(0, len(prompts), core_args.batchsize)):
+            # batch prompts
             prompt_batch = prompts[i : i + core_args.batchsize]
             # Get the prediction
             if not eval_args.no_predict:
@@ -69,14 +84,18 @@ if __name__ == "__main__":
                 else:
                     predictions.extend(model.predict_batch(prompt_batch))
 
-        # Save the prompts
-        with open(base_path / "prompts.json", "w") as f:
-            json.dump(prompts, f)
         # Save the predictions
         if not eval_args.no_predict:
             with open(model_output, "w") as f:
                 json.dump(predictions, f)
 
     # Evaluate the performance
-    test_data = pl.load_testdata()
-    print(evaluate(model_output, test_data, eval_args.eval_data_name))
+    # Check if eval idxs exists (if not, use the entire test set)
+    if (base_path / EVAL_IDXS_FILE).is_file():
+        with open(base_path / EVAL_IDXS_FILE, "r") as f:
+            eval_idxs = json.load(f)
+    else:
+        eval_idxs = None
+
+    reference_data = pl.load_testdata(eval_idxs)
+    print(evaluate(model_output, reference_data, eval_args.eval_data_name))

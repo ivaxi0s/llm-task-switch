@@ -22,12 +22,10 @@ def base_path_creator(
     )
 
     if eval_args.iterative:
-        output_path = (
-            output_path
-            / "iterative"
-        )
+        output_path = output_path / "iterative"
 
     output_path.mkdir(parents=create, exist_ok=True)
+    print("Saving to output path: ", output_path)
 
     return output_path
 
