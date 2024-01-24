@@ -5,11 +5,11 @@
 
 conda activate inctxt
 
-MODEL_NAME="llama-7b"
+MODEL_NAME="mistral-7b"
 
 # incontext: gigaword
 echo "Incontext: gigaword"
-for i in {0..16..2}; do
+for i in {0..10..2}; do
   echo "---Running with $i examples---"
   # python main.py --eval_data_name gigaword --incontext_data_name gigaword --num_examples $i --force_rerun
   python main.py \
@@ -17,7 +17,10 @@ for i in {0..16..2}; do
     --incontext_data_name gigaword \
     --num_examples $i \
     --model_name $MODEL_NAME \
-    --batchsize 10
+    --force_rerun \
+    --iterative \
+    --batchsize 1 \
+    --gpu_id 1
 done
 
 # incontext: rotten tomatoes

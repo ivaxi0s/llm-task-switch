@@ -1,16 +1,16 @@
 #!/bin/bash
 # This script runs the pilot experiment
 # test set: gigaword
-# incontext dataset: rotten tomatoes
+# incontext dataset: cnn dailymail
 
 conda activate inctxt
 
 MODEL_NAME="mistral-7b"
-INCONTEXT="rotten_tomatoes"
+INCONTEXT="dailymail"
 
 # incontext: gigaword
 echo "Incontext: $INCONTEXT"
-for i in {0..16..2}; do
+for i in {0..10..1}; do
   echo "---Running with $i examples---"
   # python main.py --eval_data_name gigaword --incontext_data_name gigaword --num_examples $i --force_rerun
   python main.py \
@@ -18,6 +18,7 @@ for i in {0..16..2}; do
     --incontext_data_name $INCONTEXT \
     --num_examples $i \
     --model_name $MODEL_NAME \
-    --batchsize 50 \
-    --gpu_id 0
+    --batchsize 1 \
+    --iterative \
+    --gpu_id 2
 done
