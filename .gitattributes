@@ -1,0 +1,6 @@
+iterative/predictions.json filter=lfs diff=lfs merge=lfs -text
+iterative/eval_idxs.json filter=lfs diff=lfs merge=lfs -text
+iterative/results.json filter=lfs diff=lfs merge=lfs -text
+**/iterative/results.json filter=lfs diff=lfs merge=lfs -text
+**/iterative/predictions.json filter=lfs diff=lfs merge=lfs -text
+**/iterative/eval_idxs.json filter=lfs diff=lfs merge=lfs -text

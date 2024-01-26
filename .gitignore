@@ -8,7 +8,11 @@ machine.file.*
 CMDs/
 
 # Folder to store experiments
-experiments/
+experiments/**/num_examples_*/*.json
+prompts.json
+# experiments/**/prompts.json
+# !experiments/**/iterative/
+# !experiments/**/iterative/predictions.json
 
 .env
 .idea/
