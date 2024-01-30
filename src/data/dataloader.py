@@ -2,12 +2,12 @@ import random
 
 from src import SEED
 from tqdm import tqdm
-from copy import deepcopy
-from typing import List, Dict, Tuple, Any, Generator
+from typing import Any, Generator
 from datasets import load_dataset, DatasetDict
 from dataclasses import dataclass
 from abc import abstractmethod
 import numpy as np
+from transformers import AutoTokenizer
 
 
 class PromptLoader:
@@ -25,6 +25,8 @@ class PromptLoader:
             self.eval_set = DailymailDataLoader()
         elif eval == "rotten_tomatoes":
             self.eval_set = RottenTomatoesDataLoader()
+        elif eval == "tweetqa":
+            self.eval_set = TweetQADataLoader()
 
         if incontext == eval:
             # Prevent having to loading same dataset twice
@@ -185,6 +187,24 @@ class RottenTomatoesDataLoader(DataLoader):
     PROMPT_PREFIX = (
         "Please read the following pairs of movie reviews and sentiment:\n\n"
     )
+    EVAL_PROMPT_PREFIX = (
+        # "Please perform a Sentiment Classification task. "
+        # "Given the following movie review, assign a sentiment label from ['negative', 'positive'].\n"
+        "Can you choose only one sentiment ['negative', 'positive'] for this review.\n"
+    )
+    EVAL_PROMPT_SUFFIX = (
+        ""
+        "\nReturn only the sentiment label without any other text."
+        # "\nChoose ONLY one from the ['negative', 'positive']. "
+        # "\nThink step by step."
+        " Make sure to follow the format otherwise your answer will be disqualified:\n"
+        "<Answer> positive / negative </Answer>.\n Do not output neutral."
+    )
+    SYSTEM_PROMPT = (
+        # "Make sure to follow the format otherwise your answer will be disqualified. "
+        # "FORMAT: <Answer>  </Answer>."
+        ""
+    )
 
     def __init__(self):
         super().__init__(dataset_name="rotten_tomatoes")
@@ -198,7 +218,9 @@ class RottenTomatoesDataLoader(DataLoader):
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
-        self.test = self.test.map(RottenTomatoesDataLoader._eval_prompt)
+        self.test = self.test.map(
+            RottenTomatoesDataLoader._eval_prompt, load_from_cache_file=False
+        )
 
     def load_test_reference(self):
         """Return the test data as a list[str]"""
@@ -216,7 +238,12 @@ class RottenTomatoesDataLoader(DataLoader):
         """Transform a single example to incontext prompt"""
         return {
             "prompt": (
-                "review: " + example["text"] + "\nsentiment: " + example["sentiment"]
+                "review: "
+                + example["text"]
+                + "\nsentiment: "
+                + "<Answer> "
+                + example["sentiment"]
+                + " </Answer>"
             ),
         }
 
@@ -224,10 +251,12 @@ class RottenTomatoesDataLoader(DataLoader):
     def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
         """Transform a single example to evaluation prompt"""
         return {
-            "eval_prompt": "Please perform a Sentiment Classification task. "
-            "Given the following movie review, assign a sentiment label from ['negative', 'positive']. "
-            "Return only the sentiment label without any other text.\n"
-            + example["text"]
+            "eval_prompt": (
+                RottenTomatoesDataLoader.EVAL_PROMPT_PREFIX
+                + "review: "
+                + example["text"]
+                + RottenTomatoesDataLoader.EVAL_PROMPT_SUFFIX
+            ),
         }
 
     def incontext_prompt(self, num_examples: int, seed: int = SEED):
@@ -254,19 +283,26 @@ class RottenTomatoesDataLoader(DataLoader):
             num_examples: number of incontext examples to include
             seed: random seed for selecting examples. e.g. this could be the iteration number
         """
-        if num_examples == 0:
-            return []
+        out = [
+            {"role": "system", "content": RottenTomatoesDataLoader.SYSTEM_PROMPT},
+        ]
         out = []
+        if num_examples == 0:
+            return out
         rng = np.random.default_rng(seed)
         idxs = rng.choice(len(self.train), num_examples, replace=False)
         examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
 
         for ex in examples:
-            command = "Please perform a Sentiment Classification task. "
-            "Given the following movie review, assign a sentiment label from ['negative', 'positive']. "
-            "Return only the sentiment label without any other text.\n"
             parts = ex.split("\nsentiment: ")
-            out.append({"role": "user", "content": command + parts[0]})
+            out.append(
+                {
+                    "role": "user",
+                    "content": RottenTomatoesDataLoader.EVAL_PROMPT_PREFIX
+                    + parts[0]
+                    + RottenTomatoesDataLoader.EVAL_PROMPT_SUFFIX,
+                }
+            )
             out.append({"role": "assistant", "content": parts[1]})
         return out
 
@@ -376,6 +412,10 @@ class DailymailDataLoader(DataLoader):
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
         self.train = self.train.map(DailymailDataLoader._prompt)
+        print("Removing large training set examples")
+        print("Original training set size: ", len(self.train))
+        self.train = self._remove_large_training_set_examples()
+        print("New Training set size: ", len(self.train))
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
@@ -384,6 +424,18 @@ class DailymailDataLoader(DataLoader):
     def load_test_reference(self):
         """Return the test data reference (answers) as a list[str]"""
         return self.test["highlights"]
+
+    def _remove_large_training_set_examples(self, max_prompt_len: int = 1792):
+        """Remove examples with large token size from training set
+
+        This is so that the in context examples aren't so big
+        """
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        return self.train.filter(
+            lambda example: (
+                len(tokenizer(example["prompt"])["input_ids"]) < max_prompt_len
+            )
+        )
 
     @staticmethod
     def _prompt(example: dict[str, Any]) -> dict[str, str]:
@@ -540,7 +592,7 @@ class TweetQADataLoader(DataLoader):
     PROMPT_PREFIX = "Please read the following triplet of contexts, questions and answers and summaries:\n\n"
 
     def __init__(self):
-        super().__init__(dataset_name="tweet_qa")
+        super().__init__(dataset_name="lmqg/qag_tweetqa")
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -552,7 +604,7 @@ class TweetQADataLoader(DataLoader):
 
     def load_test_reference(self):
         """Return the test data as a list[str]"""
-        return self.test["Answer"]
+        return [a[0] for a in self.test["answers"]]
 
     @staticmethod
     def _prompt(example: dict[str, Any]) -> dict[str, str]:
@@ -560,11 +612,11 @@ class TweetQADataLoader(DataLoader):
         return {
             "prompt": (
                 "tweet: "
-                + example["Tweet"]
+                + example["paragraph"]
                 + "\nquestion: "
-                + example["Question"]
+                + example["questions"][0]
                 + "\nanswer: "
-                + example["Answer"][0]
+                + example["answers"][0]
             ),
         }
 
@@ -573,7 +625,7 @@ class TweetQADataLoader(DataLoader):
         """Transform a single example to evaluation prompt"""
         return {
             "eval_prompt": "Read the given tweet and answer the corresponding question.\n"
-            "tweet: " + example["Tweet"] + "\nquestion: " + example["Question"]
+            "tweet: " + example["paragraph"] + "\nquestion: " + example["questions"][0]
         }
 
     def incontext_prompt(self, num_examples: int, seed: int = SEED):

@@ -66,6 +66,14 @@ if __name__ == "__main__":
                 num_examples=eval_args.num_examples, eval_size=eval_args.eval_size
             )
 
+        # If mistral model, remove system prompts
+        if core_args.model_name == "mistral-7b":
+            prompts = [
+                [p for p in prompt if p["role"] != "system"] for prompt in prompts
+            ]
+
+        print(prompts[0])
+
         # Save the prompts
         with open(base_path / "prompts.json", "w") as f:
             json.dump(prompts, f)
@@ -94,8 +102,18 @@ if __name__ == "__main__":
     if (base_path / EVAL_IDXS_FILE).is_file():
         with open(base_path / EVAL_IDXS_FILE, "r") as f:
             eval_idxs = json.load(f)
+            print(f"Loaded eval idxs: {len(eval_idxs)}")
     else:
         eval_idxs = None
 
     reference_data = pl.load_testdata(eval_idxs)
-    print(evaluate(model_output, reference_data, eval_args.eval_data_name))
+    print(
+        evaluate(
+            model_output,
+            reference_data,
+            eval_args.eval_data_name,
+            # Revaluate if predictions are re-run
+            # use_cached=core_args.force_rerun,
+            use_cached=False,
+        )
+    )
