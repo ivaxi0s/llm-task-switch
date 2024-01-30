@@ -200,11 +200,6 @@ class RottenTomatoesDataLoader(DataLoader):
         " Make sure to follow the format otherwise your answer will be disqualified:\n"
         "<Answer> positive / negative </Answer>.\n Do not output neutral."
     )
-    SYSTEM_PROMPT = (
-        # "Make sure to follow the format otherwise your answer will be disqualified. "
-        # "FORMAT: <Answer>  </Answer>."
-        ""
-    )
 
     def __init__(self):
         super().__init__(dataset_name="rotten_tomatoes")
@@ -283,9 +278,7 @@ class RottenTomatoesDataLoader(DataLoader):
             num_examples: number of incontext examples to include
             seed: random seed for selecting examples. e.g. this could be the iteration number
         """
-        out = [
-            {"role": "system", "content": RottenTomatoesDataLoader.SYSTEM_PROMPT},
-        ]
+
         out = []
         if num_examples == 0:
             return out

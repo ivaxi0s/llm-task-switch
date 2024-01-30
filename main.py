@@ -66,12 +66,6 @@ if __name__ == "__main__":
                 num_examples=eval_args.num_examples, eval_size=eval_args.eval_size
             )
 
-        # If mistral model, remove system prompts
-        if core_args.model_name == "mistral-7b":
-            prompts = [
-                [p for p in prompt if p["role"] != "system"] for prompt in prompts
-            ]
-
         print(prompts[0])
 
         # Save the prompts
