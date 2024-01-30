@@ -8,8 +8,8 @@
 
 conda activate inctxt
 
-# MODEL_NAME="mistral-7b"
 INCONTEXT="dailymail"
+MODEL_NAME="llama-7b"
 # NUM_EXAMPLES=4 # Set this as an argument
 
 # incontext: gigaword
@@ -18,6 +18,7 @@ echo "Incontext: $INCONTEXT"
 echo "---Running with $NUM_EXAMPLES examples---"
 python ../main.py \
   --eval_data_name gigaword \
+  --model_name $MODEL_NAME \
   --incontext_data_name $INCONTEXT \
   --batchsize 1 \
   --iterative \

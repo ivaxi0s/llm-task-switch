@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --gres=gpu:1
-#SBATCH --time=7:00:00
+#SBATCH --time=5:00:00
 #SBATCH --mail-type=BEGIN,END,FAIL
 #! Uncomment this to prevent the job from being requeued (e.g. if
 #! interrupted by node failure or system downtime):
@@ -20,8 +20,8 @@ mpi_tasks_per_node=$(echo "$SLURM_TASKS_PER_NODE" | sed -e 's/^\([0-9][0-9]*\).*
 module purge                  # Removes all modules still loaded
 module load rhel8/default-amp # REQUIRED - loads the basic environment
 
+# application="/home/ag2118/rds/hpc-work/inctxt/inctxt/scripts/eval_gw/single_gw-dm.sh"
 application="/home/ag2118/rds/hpc-work/inctxt/inctxt/scripts/eval_dm/single_dm.sh"
-# application="/home/ag2118/rds/hpc-work/inctxt/inctxt/scripts/eval_dm/single_gw-dm.sh"
 
 #! Run options for the application:
 options=""

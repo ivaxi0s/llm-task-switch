@@ -10,7 +10,7 @@ conda activate inctxt
 
 # MODEL_NAME="mistral-7b"
 INCONTEXT="dailymail"
-MODEL_NAME="mistral-7b"
+MODEL_NAME="llama-7b"
 
 # NUM_EXAMPLES=4 # Set this as an argument
 

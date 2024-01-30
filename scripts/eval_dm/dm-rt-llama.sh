@@ -8,8 +8,8 @@ conda activate inctxt
 MODEL_NAME="llama-7b"
 
 # incontext: gigaword
-echo "Incontext: dailymail"
-for i in {0..10..1}; do
+echo "Incontext: rotten_tomatoes"
+for i in {0..10..2}; do
   echo "---Running with $i examples---"
   # python main.py --eval_data_name gigaword --incontext_data_name gigaword --num_examples $i --force_rerun
   python main.py \
@@ -21,7 +21,7 @@ for i in {0..10..1}; do
     --iterative \
     --batchsize 1 \
     --eval_size 1000 \
-    --gpu_id 1
+    --gpu_id 2
 done
 
 # incontext: rotten tomatoes

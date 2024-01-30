@@ -21,5 +21,6 @@ for i in {1..10..1}; do
     --batchsize 1 \
     --eval_size 1000 \
     --iterative \
+    --force_rerun \
     --gpu_id 0
 done

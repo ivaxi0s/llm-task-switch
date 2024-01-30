@@ -20,5 +20,6 @@ for i in {0..10..1}; do
     --model_name $MODEL_NAME \
     --batchsize 1 \
     --iterative \
-    --gpu_id 2
+    --force_rerun \
+    --gpu_id 0
 done
