@@ -61,7 +61,7 @@ class HFModel:
         self.model.to(device)
         self.device = device
 
-        self.max_new_tokens = 5800  # Twice the max len of train set summaries
+        self.max_new_tokens = 512  # Twice the 99.9th percentile of train set summaries
         print(f"Max new tokens: {self.max_new_tokens}")
 
         # TODO: check if model outputs input prompt tokens or just the ouptut

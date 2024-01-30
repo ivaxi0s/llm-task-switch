@@ -25,6 +25,33 @@ OPENAI_API_KEY=mykey
 ---
 ## Results
 
+### Max token length
+
+Motivation: limit the token size of in context set so that there is enough space for the generation of output.
+llama seems to be the bottleneck: 4096 token width limit. 
+If we want 10 in context examples, that means we should expect 11 user-assistant turns: 4096 / 11 = 370. 
+
+We also note that llama produces more tokens on avg than mistral. 
+We also note that dailymail has the examples in training with a max token length of up to 3k. The distribution of the token lengths is:
+
+```
+Max token length: 2991
+Min token length: 7
+Mean token length: 79.3905117497292
+Median token length: 75.0
+Std token length: 32.73271912832664
+99.9th percentile token length: 268.0
+```
+
+Thus we limit the in context token size to 268.
+(This doesn't include the token sizes of the surrounding prompts).
+
+###
+
+Set truncation to 150 and re-running experiments:
+- llama-7b: gw-gw (0,1,2,3,4,5,6,7,); gw-rt (0,1,2,3,4,6,8,)
+- mistral-7b: gw-dm num_examples=(1,2,3,)
+
 ### Mistral-7b
 
 Switching to Mistral-7b because it is cheaper.
