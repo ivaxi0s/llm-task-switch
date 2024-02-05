@@ -7,6 +7,7 @@ from datasets import load_dataset, DatasetDict
 from dataclasses import dataclass
 from abc import abstractmethod
 import numpy as np
+import re
 from transformers import AutoTokenizer
 
 
@@ -27,6 +28,12 @@ class PromptLoader:
             self.eval_set = RottenTomatoesDataLoader()
         elif eval == "tweetqa":
             self.eval_set = TweetQADataLoader()
+        elif eval == "gsm8k":
+            self.eval_set = GSM8KDataLoader()
+        elif eval == "mmluaa":
+            self.eval_set = MMLUAbstractAlgebraDataLoader()
+        else:
+            raise ValueError(f"Unknown eval dataset: {eval}")
 
         if incontext == eval:
             # Prevent having to loading same dataset twice
@@ -41,6 +48,12 @@ class PromptLoader:
             self.incontext_set = RottenTomatoesDataLoader()
         elif incontext == "tweetqa":
             self.incontext_set = TweetQADataLoader()
+        elif incontext == "gsm8k":
+            self.incontext_set = GSM8KDataLoader()
+        elif incontext == "mmluaa":
+            self.incontext_set = MMLUAbstractAlgebraDataLoader()
+        else:
+            raise ValueError(f"Unknown incontext dataset: {incontext}")
 
     def load_prompt(self, num_examples: int, eval_size: int):
         """Return prompts from different datasets
@@ -130,17 +143,16 @@ class PromptLoader:
 class DataLoader:
     """Abstract class for loading data"""
 
-    dataset_name: str
+    dataset_path: str
+    dataset_name: str | None = None
     _dataset: DatasetDict | None = None
     test: DatasetDict | None = None
 
     @property
     def dataset(self):
         if self._dataset is None:
-            if self.dataset_name == "cnn_dailymail":
-                self._dataset = load_dataset(self.dataset_name, "3.0.0")
-            else:
-                self._dataset = load_dataset(self.dataset_name)
+            self._dataset = load_dataset(self.dataset_path, self.dataset_name)
+
         return self._dataset
 
     @abstractmethod
@@ -202,14 +214,16 @@ class RottenTomatoesDataLoader(DataLoader):
     )
 
     def __init__(self):
-        super().__init__(dataset_name="rotten_tomatoes")
+        super().__init__(dataset_path="rotten_tomatoes")
 
         # Map all labels to sentiments
         self._dataset = self.dataset.map(RottenTomatoesDataLoader._label_to_sentiment)
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
-        self.train = self.train.map(RottenTomatoesDataLoader._prompt)
+        self.train = self.train.map(
+            RottenTomatoesDataLoader._prompt, load_from_cache_file=False
+        )
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
@@ -310,7 +324,7 @@ class GigawordDataLoader(DataLoader):
     PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
-        super().__init__(dataset_name="gigaword")
+        super().__init__(dataset_path="gigaword")
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -400,7 +414,7 @@ class DailymailDataLoader(DataLoader):
     PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
-        super().__init__(dataset_name="cnn_dailymail")
+        super().__init__(dataset_path="cnn_dailymail", dataset_name="3.0.0")
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -496,7 +510,7 @@ class WikicatDataLoader(DataLoader):
     PROMPT_PREFIX = "Please read the following pairs of texts and summaries:\n\n"
 
     def __init__(self):
-        super().__init__(dataset_name="GEM/wiki_cat_sum")
+        super().__init__(dataset_path="GEM/wiki_cat_sum")
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -585,7 +599,7 @@ class TweetQADataLoader(DataLoader):
     PROMPT_PREFIX = "Please read the following triplet of contexts, questions and answers and summaries:\n\n"
 
     def __init__(self):
-        super().__init__(dataset_name="lmqg/qag_tweetqa")
+        super().__init__(dataset_path="lmqg/qag_tweetqa")
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -666,5 +680,245 @@ class TweetQADataLoader(DataLoader):
             command = "Read the given tweet and answer the corresponding question.\n"
             parts = ex.split("\nanswer: ")
             out.append({"role": "user", "content": command + parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
+        return out
+
+
+class GSM8KDataLoader(DataLoader):
+    """DataLoader for GSM8K dataset
+
+    NOTE: DatasetDict is of the form:
+    {train, validation, test} with features: {question, answer}
+    """
+
+    # Regex to extract "#### Number" from the answer
+    r_number = re.compile(r"#### (.*)$")
+    r_answer = re.compile(r"#### .*$")
+
+    EVAL_PROMPT_PREFIX = (
+        "Answer the following question. "
+        "Think step by step. "
+        "Give your final answer in the following format with the tags provided: "
+        "<Answer> number </Answer>. "
+        "Your answer must be a numerical integer and exclude units.\n"
+    )
+    EVAL_PROMPT_SUFFIX = ""
+
+    def __init__(self):
+        super().__init__(dataset_path="gsm8k", dataset_name="main")
+
+        # Map the training set to add answer tags
+        self._dataset = self.dataset.map(GSM8KDataLoader._add_answer_tags)
+
+        # Map the training set to incontext prompts
+        self.train = self.dataset["train"]
+        self.train = self.train.map(GSM8KDataLoader._prompt, load_from_cache_file=False)
+
+        # Map the test set to evaluation prompts
+        self.test = self.dataset["test"]
+        self.test = self.test.map(
+            GSM8KDataLoader._eval_prompt, load_from_cache_file=False
+        )
+
+    def load_test_reference(self):
+        """Return the test data as a list[str]"""
+        return self.test["value"]
+
+    @staticmethod
+    def _add_answer_tags(example: dict[str, Any]) -> dict[str, str]:
+        """Add answer tags to the example"""
+        answer = example["answer"]
+        # Extract the number from the answer
+        vals = GSM8KDataLoader.r_number.findall(answer)
+        if len(vals) != 1:
+            raise ValueError("Value not found in ", answer)
+        val = vals[0]
+        # Remove comma
+        val = val.replace(",", "")
+        # Check if value is int
+        val = float(val)
+        if not val.is_integer():
+            print(val)
+            raise ValueError("Value is not an integer")
+        val = int(val)
+
+        answer = GSM8KDataLoader.r_answer.sub(f"<Answer> {val} </Answer>", answer)
+
+        return {"answer_with_tags": answer, "value": val}
+
+    @staticmethod
+    def _prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to incontext prompt"""
+        return {
+            "prompt": (
+                GSM8KDataLoader.EVAL_PROMPT_PREFIX
+                + "question: "
+                + example["question"]
+                + GSM8KDataLoader.EVAL_PROMPT_SUFFIX
+                + "\nanswer: "
+                + example["answer_with_tags"]
+            ),
+        }
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": GSM8KDataLoader.EVAL_PROMPT_PREFIX
+            + "question: "
+            + example["question"]
+            + GSM8KDataLoader.EVAL_PROMPT_SUFFIX
+        }
+
+    def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext examples to include
+            seed: random seed for selecting examples. e.g. this could be the iteration number
+
+        Returns:
+            list of dictionaries with keys 'role' and 'content'
+        """
+        if num_examples == 0:
+            return []
+
+        out = []
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        # examples = self.train.shuffle(seed=seed, keep_in_memory=True).select(
+        #     range(num_examples), keep_in_memory=True
+        # )["prompt"]
+
+        # out = out + "\n".join(examples) + "\n"
+        for ex in examples:
+            parts = ex.split("\nanswer: ")
+            out.append({"role": "user", "content": parts[0]})
+            out.append({"role": "assistant", "content": parts[1]})
+        return out
+
+
+class MMLUAbstractAlgebraDataLoader(DataLoader):
+    """DataLoader for MMLU Abstract Algebra dataset
+
+    NOTE: DatasetDict is multiple choice of the form:
+    {train, validation, test} with features: {input, A,B,C,D,target}
+    """
+
+    PROMPT_PREFIX = (
+        "You have a multiple choice question on Abstract Algebra. "
+        "Only one of the options is correct: A, B, C, or D. "
+        # "If you think the answer is A, then say <Answer> A </Answer>. "
+        # "If you think the answer is B, then say <Answer> B </Answer>. "
+        # "If you think the answer is C, then say <Answer> C </Answer>. "
+        # "If you think the answer is D, then say <Answer> D </Answer>. "
+        "Give your answer in the following format with the tags provided: "
+        "<Answer> </Answer>. "
+        # "where option is one of A, B, C, D.\n"
+        "Please read the following question and options and answer the question.\n"
+    )
+    PROMPT_SUFFIX = ""
+
+    def __init__(self):
+        super().__init__(dataset_path="lukaemon/mmlu", dataset_name="abstract_algebra")
+
+        # Map the training set to incontext prompts
+        self.train = self.dataset["train"]
+        self.train = self.train.map(
+            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
+        )
+        self.train = self.train.map(
+            MMLUAbstractAlgebraDataLoader._prompt, load_from_cache_file=False
+        )
+
+        # Map the test set to evaluation prompts
+        self.test = self.dataset["test"]
+        self.test = self.test.map(
+            MMLUAbstractAlgebraDataLoader._eval_prompt, load_from_cache_file=False
+        )
+        self.test = self.test.map(
+            MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=False
+        )
+
+    @staticmethod
+    def _add_answer_tags(example: dict[str, Any]) -> dict[str, str]:
+        """Add answer tags to the target"""
+        return {"target_with_tags": "<Answer> " + example["target"] + " </Answer>"}
+
+    @staticmethod
+    def _target_text(example: dict[str, Any]) -> dict[str, tuple]:
+        """Column for the target answer as text"""
+        letter = example["target"]
+        return {
+            "target_text": (
+                letter.upper(),
+                example["A"],
+                example["B"],
+                example["C"],
+                example["D"],
+            )
+        }
+
+    def load_test_reference(self):
+        """Return the test data as a list[str]"""
+        return self.test["target_text"]
+
+    @staticmethod
+    def _prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to incontext prompt"""
+        return {
+            "prompt": (
+                MMLUAbstractAlgebraDataLoader.PROMPT_PREFIX
+                + "\nQuestion: "
+                + example["input"]
+                + "\n(A) "
+                + example["A"]
+                + "\n(B) "
+                + example["B"]
+                + "\n(C) "
+                + example["C"]
+                + "\n(D) "
+                + example["D"]
+                + "\nanswer: "
+                + example["target_with_tags"]
+            ),
+        }
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any]) -> dict[str, str]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": MMLUAbstractAlgebraDataLoader.PROMPT_PREFIX
+            + "\nQuestion: "
+            + example["input"]
+            + " (A) "
+            + example["A"]
+            + " (B) "
+            + example["B"]
+            + " (C) "
+            + example["C"]
+            + " (D) "
+            + example["D"]
+        }
+
+    def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext
+        """
+        if num_examples == 0:
+            return []
+
+        out = []
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)["prompt"]
+
+        for ex in examples:
+            parts = ex.split("\nanswer: ")
+            out.append({"role": "user", "content": parts[0]})
             out.append({"role": "assistant", "content": parts[1]})
         return out

@@ -1,12 +1,13 @@
 import json
 import re
 from pathlib import Path
-import evaluate as hf_evl
+import evaluate as hf_evl  # type: ignore
 
 # RE patterns for extracting config information from results folder path
 RE_INCTXT = re.compile(r"^incontext_data_(.*)")  # Extract in context set
 RE_NUM_EXAMPLES = re.compile(r"^num_examples_(.*)")  # Extract number of examples
 RE_EVAL_DATA = re.compile(r"^eval_data_(.*)")  # Extract eval data name
+RE_ANSWER_TAGS = re.compile(r"<Answer>(.*?)</Answer>")
 
 
 def evaluate(
@@ -44,6 +45,8 @@ def evaluate(
         "gigaword": eval_gigaword,
         "dailymail": eval_dailymail,
         "tweetqa": eval_tweetqa,
+        "gsm8k": eval_gsm8k,
+        "mmluaa": eval_mmluaa,
     }
 
     # evaluate predictions
@@ -180,6 +183,100 @@ def eval_tweetqa(pred_data: list, ref_data: list):
     meteor_scores: dict = meteor.compute(predictions=pred_data, references=ref_data)
 
     return rouge_scores | meteor_scores
+
+
+def eval_gsm8k(pred_data: list, ref_data: list):
+    """Evaluate gms8k dataset using accuracy"""
+    assert len(pred_data) == len(ref_data)
+    matches = 0
+    failed = 0
+    for pred, ref in zip(pred_data, ref_data):
+        # Extract the number from the end of the string
+        # Assume <Answer> number </Answer>
+        pred_answers = RE_ANSWER_TAGS.findall(pred)
+        if not pred_answers:
+            failed += 1
+            continue
+        answer = pred_answers[-1]
+        answer = answer.strip()
+        # Remove commas and space from answer
+        answer = answer.replace(",", "")
+        answer = answer.replace(" ", "")
+
+        try:
+            answer = float(answer)
+            if answer.is_integer():
+                answer = int(answer)
+            else:
+                continue
+            if answer == ref:
+                matches += 1
+        except Exception as e:
+            failed += 1
+            print(
+                f"---Failed for Answer: {answer}\n: Reference: {ref}\n: Exception: {e}"
+            )
+            continue
+    return {
+        "matches": matches,
+        "failed": failed,
+        "total": len(pred_data),
+    }
+
+
+def eval_mmluaa(pred_data: list, ref_data: list):
+    """Evaluate mmluaa dataset using accuracy"""
+    assert len(pred_data) == len(ref_data)
+    matches = 0
+    failed = 0
+    for pred, ref_letters_texts in zip(pred_data, ref_data):
+        ref, *ref_text = ref_letters_texts
+        # Extract the number from the end of the string
+        # Assume <Answer> letter </Answer>
+        pred_answers = RE_ANSWER_TAGS.findall(pred)
+        if not pred_answers:
+            failed += 1
+            continue
+        # If there are multuple answer tags, then we count this as a fail
+        if len(pred_answers) > 1:
+            failed += 1
+            print(f"---Failed; Multiple Answer: {pred_answers}\n: Reference: {ref}")
+            continue
+
+        answer = pred_answers[0]
+        answer = answer.strip()
+
+        if len(answer) == 1:
+            if answer.upper() == ref:
+                matches += 1
+            continue
+
+        # Otherwise, perhaps the text is in the answer tags
+        # Convert reference and answers to lowercase
+        ref_text = [text.lower() for text in ref_text]
+        answer = answer.lower()
+
+        correct_ref_text_idx = ord(ref) - ord("A")
+        correct_text = ref_text.pop(correct_ref_text_idx)
+        # Check if the correct text is in the prediction
+        if correct_text in answer:
+            matches += 1
+            continue
+        # Check if any of the other texts are in the prediction
+        if any(text in answer for text in ref_text):
+            continue
+        #  If none of the other texts are in the prediction,
+        #  then we failed to extract the model prediction
+        failed += 1
+        print(
+            f"---Failed for Answer: {answer}\n: Reference: {ref}, {ref_text}:\nPrediction: {pred}"
+        )
+
+    return {
+        "matches": matches,
+        "failed": failed,
+        "total": len(pred_data),
+    }
 
 
 def mean_num_of_characters(pred_data):
