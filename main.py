@@ -45,17 +45,11 @@ if __name__ == "__main__":
 
     # IF model predictions exist, load them
     model_output = base_path / "predictions.json"
-    if model_output.is_file() and not core_args.force_rerun:
+    if not core_args.force_rerun and model_output.is_file():
         print("Loading predictions from cache")
 
     # ELSE: run inference using the model
     else:
-        # Initialise / load model
-        print(f"Loading model: {core_args.model_name}")
-        model = get_model(core_args.model_name, core_args.gpu_id)
-
-        predictions = []
-
         print("Loading prompts")
         if eval_args.iterative:
             eval_idxs, prompts = pl.load_prompt_iterative(
@@ -75,21 +69,24 @@ if __name__ == "__main__":
         with open(base_path / EVAL_IDXS_FILE, "w") as f:
             json.dump(eval_idxs, f)
 
-        # Get predictions on test set
-        for i in tqdm(range(0, len(prompts), core_args.batchsize)):
-            # batch prompts
-            prompt_batch = prompts[i : i + core_args.batchsize]
-            # Get the prediction
-            if not eval_args.no_predict:
+        if not eval_args.no_predict:
+            predictions = []
+            # Initialise / load model
+            print(f"Loading model: {core_args.model_name}")
+            model = get_model(core_args.model_name, core_args.gpu_id)
+            # Get predictions on test set
+            for i in tqdm(range(0, len(prompts), core_args.batchsize)):
+                # batch prompts
+                prompt_batch = prompts[i : i + core_args.batchsize]
                 if eval_args.iterative:
                     predictions.extend(model.predict_batch_iteratively(prompt_batch))
                 else:
                     predictions.extend(model.predict_batch(prompt_batch))
 
-        # Save the predictions
-        if not eval_args.no_predict:
-            with open(model_output, "w") as f:
-                json.dump(predictions, f)
+            # Save the predictions
+            if not eval_args.no_predict:
+                with open(model_output, "w") as f:
+                    json.dump(predictions, f)
 
     # Evaluate the performance
     # Check if eval idxs exists (if not, use the entire test set)
