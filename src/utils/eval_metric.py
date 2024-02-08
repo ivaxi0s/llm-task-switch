@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 import evaluate as hf_evl  # type: ignore
+import numpy as np
+import pickle
 
 # RE patterns for extracting config information from results folder path
 RE_INCTXT = re.compile(r"^incontext_data_(.*)")  # Extract in context set
@@ -57,10 +59,27 @@ def evaluate(
     results = dataset_eval[ref_data_name](pred_data, ref_data)
     # include config information in results
     results |= extract_config_from_path(pred_fpath)
+    # Calculate baseline likelihood
+    results |= calculate_baseline_likelihood(pred_fpath)
     # Store results in json in same dir as pred_fpath
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     return results
+
+def calculate_baseline_likelihood(pred_fpath: Path):
+    """Calculate the Expected likelihood of the baseline response"""
+    fpath = Path(pred_fpath.parent / "baseline_probabilities.pkl")
+if not fpath.is_file():
+        print(f"Baseline probabilities not found at {fpath}")
+        return {"baseline_likelihood": None}
+    baseline_probabilities = pickle.load(open(fpath, "rb"))
+    breakpoint()
+    # baseline_probabilities = np.load(fpath)
+    # Likelihood is product over all tokens
+    log_likelihood = [np.mean(np.log(probs)) for probs in baseline_probabilities]
+    # Calculate the mean likelihood over all tokens
+    log_likelihood = np.mean(log_likelihood)
+    return {"baseline_likelihood": float(log_likelihood)}
 
 
 def extract_config_from_path(results_folder: str | Path, subdir="iterative"):

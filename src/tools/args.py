@@ -58,6 +58,8 @@ class EvalArgs:
     no_predict: bool
     eval_size: int | None  # Number of examples to evaluate on (if > test set size, use test set size)
     iterative: bool
+    likelihoods: bool
+
 
     @staticmethod
     def argparse() -> "EvalArgs":
@@ -101,6 +103,11 @@ class EvalArgs:
             action="store_true",
             help="Provide incontext examples iteratively",
         )
+        commandLineParser.add_argument(
+            "--likelihoods",
+            action="store_true",
+            help="Provide likelihoods for each example",
+        )
 
         parsedArgs, _ = commandLineParser.parse_known_args()
         return EvalArgs(
@@ -110,4 +117,5 @@ class EvalArgs:
             no_predict=parsedArgs.no_predict,
             eval_size=parsedArgs.eval_size,
             iterative=parsedArgs.iterative,
+            likelihoods=parsedArgs.likelihoods,
         )

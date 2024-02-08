@@ -13,6 +13,7 @@ prompts.json
 # experiments/**/prompts.json
 # !experiments/**/iterative/
 # !experiments/**/iterative/predictions.json
+*.pkl
 
 .env
 .idea/

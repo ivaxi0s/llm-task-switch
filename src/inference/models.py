@@ -131,7 +131,7 @@ class HFModel:
         ).strip()
         return output_text
 
-    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+    def predict_batch_iteratively(self, prompt_batch: list[list[dict]]) -> list[str]:
         """
         in context examples are passed iteratively
         assume prompt-batch is batch size x number_of_conversation_turns (role specified)
@@ -149,9 +149,9 @@ class HFModel:
             msgs.append({"role": turn["role"], "content": turn["content"]})
 
         encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+        # breakpoint()
 
         inputs = encodeds.to(self.device)
-        # breakpoint()
 
         with torch.no_grad():
             output = self.model.generate(
@@ -172,6 +172,40 @@ class HFModel:
         output_text = output_text.split("[/INST]")[-1]
         # breakpoint()
         return [output_text]
+
+    @torch.no_grad()
+    def response_probabilities(self, history: list[dict], response: str):
+        """Return the likelihood of the response given the history
+
+        Params:
+            history: list[(user, model), ...] | None
+            response: expected response
+
+        Returns:
+            likelihood: float
+        """
+
+        if history is not None:
+            msgs = [
+                {"role": turn["role"], "content": turn["content"]} for turn in history
+            ]
+
+        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+        response_tokens = self.tokenizer.encode(response, return_tensors="pt")
+        # breakpoint()
+
+        response_probabilities = []
+        # Calculate the likelihood of the response
+        for idx in range(response_tokens.shape[-1]):
+            # Concatenate the history and response_tokens upto idx (excl)
+            inputs = torch.cat([encodeds, response_tokens[:, :idx]], dim=1)
+            inputs = inputs.to(self.device)
+            # Extract logits
+            logits = self.model.forward(input_ids=inputs)["logits"]
+            probs = torch.softmax(logits[0, -1, :].cpu(), dim=-1)
+            # Find the probability of the current response token
+            response_probabilities.append(probs[response_tokens[0, idx]].numpy())
+        return response_probabilities
 
 
 def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel:
