@@ -3,7 +3,7 @@ import random
 from src import SEED
 from tqdm import tqdm
 from typing import Any, Generator
-from datasets import load_dataset, DatasetDict
+from datasets import load_dataset, DatasetDict, concatenate_datasets
 from dataclasses import dataclass
 from abc import abstractmethod
 import numpy as np
@@ -138,6 +138,14 @@ class PromptLoader:
         else:
             return [references[idx] for idx in eval_idxs]
 
+    def load_likelihood_reference(self, eval_idxs) -> list[str]:
+        """Return the reference data for likelihoods calculation"""
+        references = self.eval_set.load_likelihood_reference()
+        if eval_idxs is None:
+            return references
+        else:
+            return [references[idx] for idx in eval_idxs]
+
 
 @dataclass
 class DataLoader:
@@ -158,6 +166,14 @@ class DataLoader:
     @abstractmethod
     def incontext_prompt(self, num_examples: int, seed: int = SEED):
         ...
+
+    @abstractmethod
+    def load_test_reference(self):
+        ...
+
+    def load_likelihood_reference(self):
+        """Return the reference data for likelihoods calculation"""
+        return self.load_test_reference()
 
     def eval_prompt(
         self, eval_size: int, seed: int = SEED
@@ -218,6 +234,9 @@ class RottenTomatoesDataLoader(DataLoader):
 
         # Map all labels to sentiments
         self._dataset = self.dataset.map(RottenTomatoesDataLoader._label_to_sentiment)
+        self._dataset = self._dataset.map(
+            RottenTomatoesDataLoader._add_answer_tags, load_from_cache_file=False
+        )
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
@@ -235,6 +254,15 @@ class RottenTomatoesDataLoader(DataLoader):
         """Return the test data as a list[str]"""
         return self.test["sentiment"]
 
+    def load_likelihood_reference(self):
+        """Return the reference data for likelihoods calculation"""
+        return self.test["target_with_tags"]
+
+    @staticmethod
+    def _add_answer_tags(example: dict[str, Any]) -> dict[str, str]:
+        """Add answer tags to the target"""
+        return {"target_with_tags": "<Answer> " + example["sentiment"] + " </Answer>"}
+
     @staticmethod
     def _label_to_sentiment(example: dict[str, Any]) -> dict[str, str]:
         """Map the label to sentiment"""
@@ -250,9 +278,7 @@ class RottenTomatoesDataLoader(DataLoader):
                 "review: "
                 + example["text"]
                 + "\nsentiment: "
-                + "<Answer> "
-                + example["sentiment"]
-                + " </Answer>"
+                + example["target_with_tags"]
             ),
         }
 
@@ -807,7 +833,6 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
     {train, validation, test} with features: {input, A,B,C,D,target}
     """
 
-
     PROMPT_PREFIX = (
         "You have a multiple choice question on Abstract Algebra. "
         "Only one of the options is correct: A, B, C, or D. "
@@ -826,7 +851,9 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
         super().__init__(dataset_path="lukaemon/mmlu", dataset_name="abstract_algebra")
 
         # Map the training set to incontext prompts
-        self.train = self.dataset["train"]
+        self.train = concatenate_datasets(
+            [self.dataset["train"], self.dataset["validation"]]
+        )
         self.train = self.train.map(
             MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
         )
@@ -841,6 +868,9 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
         )
         self.test = self.test.map(
             MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=False
+        )
+        self.test = self.test.map(
+            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
         )
 
     @staticmethod
@@ -865,6 +895,10 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
     def load_test_reference(self):
         """Return the test data as a list[str]"""
         return self.test["target_text"]
+
+    def load_likelihood_reference(self):
+        """Return the test data as a list[str] to be used for likelihood calculation"""
+        return self.test["target_with_tags"]
 
     @staticmethod
     def _prompt(example: dict[str, Any]) -> dict[str, str]:
