@@ -20,40 +20,32 @@ class PromptLoader:
     def __init__(self, incontext: str, eval: str):
         """Load all the datasets into memory"""
 
-        if eval == "gigaword":
-            self.eval_set = GigawordDataLoader()
-        elif eval == "dailymail":
-            self.eval_set = DailymailDataLoader()
-        elif eval == "rotten_tomatoes":
-            self.eval_set = RottenTomatoesDataLoader()
-        elif eval == "tweetqa":
-            self.eval_set = TweetQADataLoader()
-        elif eval == "gsm8k":
-            self.eval_set = GSM8KDataLoader()
-        elif eval == "mmluaa":
-            self.eval_set = MMLUAbstractAlgebraDataLoader()
-        else:
+        dataloader_dict: dict = {
+            "gigaword": GigawordDataLoader,
+            "dailymail": DailymailDataLoader,
+            # "wikicat": WikicatDataLoader,
+            "rotten_tomatoes": RottenTomatoesDataLoader,
+            "tweetqa": TweetQADataLoader,
+            "gsm8k": GSM8KDataLoader,
+            "mmluaa": MMLUAbstractAlgebraDataLoader,
+            "mmlu-moral": MMLUMoralScenariosDataLoader,
+            "mmlu-math": MMLUElementaryMathematicsDataLoader,
+            "mmlu-age": MMLUHumanAgingDataLoader,
+            "mmlu-law": MMLUProfessionalLawDataLoader,
+        }
+
+        if not eval in dataloader_dict:
             raise ValueError(f"Unknown eval dataset: {eval}")
+        if not incontext in dataloader_dict:
+            raise ValueError(f"Unknown incontext dataset: {incontext}")
+
+        self.eval_set = dataloader_dict[eval]()
 
         if incontext == eval:
             # Prevent having to loading same dataset twice
             self.incontext_set = self.eval_set
-        elif incontext == "gigaword":
-            self.incontext_set = GigawordDataLoader()
-        elif incontext == "dailymail":
-            self.incontext_set = DailymailDataLoader()
-        elif incontext == "wikicat":
-            self.incontext_set = WikicatDataLoader()
-        elif incontext == "rotten_tomatoes":
-            self.incontext_set = RottenTomatoesDataLoader()
-        elif incontext == "tweetqa":
-            self.incontext_set = TweetQADataLoader()
-        elif incontext == "gsm8k":
-            self.incontext_set = GSM8KDataLoader()
-        elif incontext == "mmluaa":
-            self.incontext_set = MMLUAbstractAlgebraDataLoader()
         else:
-            raise ValueError(f"Unknown incontext dataset: {incontext}")
+            self.incontext_set = dataloader_dict[incontext]()
 
     def load_prompt(self, num_examples: int, eval_size: int):
         """Return prompts from different datasets
@@ -86,7 +78,7 @@ class PromptLoader:
 
         return eval_idxs, prompts
 
-    def load_prompt_iterative(self, num_examples: int, eval_size: int):
+    def load_prompt_iterative(self, num_examples: int, eval_size: int | None):
         """Return prompts from different datasets - iterative version of prompts: returns list of lists of dictionary
         first list iterates through samples in test dataset
         second list iterates through the user/assistant messages in turn
@@ -157,15 +149,31 @@ class DataLoader:
     test: DatasetDict | None = None
 
     @property
-    def dataset(self):
+    def dataset(self) -> DatasetDict:
         if self._dataset is None:
             self._dataset = load_dataset(self.dataset_path, self.dataset_name)
 
         return self._dataset
 
-    @abstractmethod
-    def incontext_prompt(self, num_examples: int, seed: int = SEED):
-        ...
+    @staticmethod
+    def remove_large_dataset_examples(
+        ds: DatasetDict, column: str, max_prompt_len: int = 1792
+    ):
+        """Remove examples with large token size from training set
+
+        This is so that the in context examples aren't so big
+        """
+        print("Removing large training set examples")
+        print("Original training set size: ", len(ds))
+        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+        ds = ds.filter(
+            lambda example: (
+                len(tokenizer(example[column])["input_ids"]) < max_prompt_len
+            )
+        )
+        print("New Training set size: ", len(ds))
+        # print("Max token length: ", max(ds[column]))
+        return ds
 
     @abstractmethod
     def load_test_reference(self):
@@ -176,7 +184,7 @@ class DataLoader:
         return self.load_test_reference()
 
     def eval_prompt(
-        self, eval_size: int, seed: int = SEED
+        self, eval_size: int | None, seed: int = SEED
     ) -> Generator[str, None, None]:
         """Yields prompt for evaluation examples
 
@@ -445,10 +453,9 @@ class DailymailDataLoader(DataLoader):
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
         self.train = self.train.map(DailymailDataLoader._prompt)
-        print("Removing large training set examples")
-        print("Original training set size: ", len(self.train))
-        self.train = self._remove_large_training_set_examples()
-        print("New Training set size: ", len(self.train))
+        self.train = DataLoader.remove_large_dataset_examples(
+            self.train, column="prompt"
+        )
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
@@ -457,18 +464,6 @@ class DailymailDataLoader(DataLoader):
     def load_test_reference(self):
         """Return the test data reference (answers) as a list[str]"""
         return self.test["highlights"]
-
-    def _remove_large_training_set_examples(self, max_prompt_len: int = 1792):
-        """Remove examples with large token size from training set
-
-        This is so that the in context examples aren't so big
-        """
-        tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
-        return self.train.filter(
-            lambda example: (
-                len(tokenizer(example["prompt"])["input_ids"]) < max_prompt_len
-            )
-        )
 
     @staticmethod
     def _prompt(example: dict[str, Any]) -> dict[str, str]:
@@ -826,6 +821,153 @@ class GSM8KDataLoader(DataLoader):
         return out
 
 
+class MMLUDataLoader(DataLoader):
+    """Abstract class for MMLU datasets
+
+    NOTE: DatasetDict is of the form:
+    {train, validation, test} with features: {input, A,B,C,D,target}
+    """
+
+    def __init__(self, dataset_name: str, prompt_prefix: str):
+        super().__init__(dataset_path="lukaemon/mmlu", dataset_name=dataset_name)
+
+        fn_kwargs = {"prompt_prefix": prompt_prefix}
+
+        # Map the answers to include tags
+        self._dataset = self.dataset.map(
+            MMLUDataLoader._add_answer_tags, load_from_cache_file=False
+        )
+        # Map the test set to prompts
+        self._dataset = self.dataset.map(
+            MMLUDataLoader._eval_prompt, load_from_cache_file=False, fn_kwargs=fn_kwargs
+        )
+
+        # Join train and validation sets
+        self.train: DatasetDict = concatenate_datasets(
+            [self.dataset["train"], self.dataset["validation"]]
+        )
+        self.train = DataLoader.remove_large_dataset_examples(
+            self.train, column="eval_prompt"
+        )
+
+        self.test = self.dataset["test"]
+        self.test = self.test.map(
+            MMLUDataLoader._target_text, load_from_cache_file=False
+        )
+
+    @staticmethod
+    def _add_answer_tags(example: dict[str, Any]) -> dict[str, str]:
+        """Add answer tags to the target"""
+        return {"target_with_tags": "<Answer> " + example["target"] + " </Answer>"}
+
+    @staticmethod
+    def _target_text(example: dict[str, Any]) -> dict[str, tuple]:
+        """Create a column `target_text` with tuple(target, *answers)
+
+        Column contains the tuple(
+            target, Answer A, Answer B, Answer C, Answer D
+        )
+        """
+        letter = example["target"]
+        return {
+            "target_text": (
+                letter.upper(),
+                example["A"],
+                example["B"],
+                example["C"],
+                example["D"],
+            )
+        }
+
+    def load_test_reference(self):
+        return self.test["target_text"]
+
+    @staticmethod
+    def _eval_prompt(example: dict[str, Any], prompt_prefix: str) -> dict[str, str]:
+        """Transform a single example to evaluation prompt"""
+        return {
+            "eval_prompt": (
+                prompt_prefix
+                + "\nQuestion: "
+                + example["input"]
+                + "\n(A) "
+                + example["A"]
+                + "\n(B) "
+                + example["B"]
+                + "\n(C) "
+                + example["C"]
+                + "\n(D) "
+                + example["D"]
+            ),
+        }
+
+    def incontext_prompt_iterative(self, num_examples: int, seed: int = SEED):
+        """Returns prompt for incontext examples
+
+        Args:
+            num_examples: number of incontext
+        """
+        if num_examples == 0:
+            return []
+
+        out = []
+        rng = np.random.default_rng(seed)
+        idxs = rng.choice(len(self.train), num_examples, replace=False)
+        examples = self.train.select(idxs, keep_in_memory=True)
+        prompts = examples["eval_prompt"]
+        answers = examples["target_with_tags"]
+
+        for prompt, answer in zip(prompts, answers):
+            out.append({"role": "user", "content": prompt})
+            out.append({"role": "assistant", "content": answer})
+        return out
+
+
+class MMLUElementaryMathematicsDataLoader(MMLUDataLoader):
+    """DataLoader for MMLU Elementary Mathematics dataset"""
+
+    PROMPT_PREFIX = (
+        "You have a multiple choice question on Elementary Mathematics. "
+        "Only one of the options is correct: A, B, C, or D. "
+        "Give your answer in the following format with the tags provided: "
+        "<Answer> </Answer>. "
+        "Please read the following question and options and answer the question.\n"
+    )
+
+    def __init__(self, dataset_name="elementary_mathematics"):
+        super().__init__(dataset_name=dataset_name, prompt_prefix=self.PROMPT_PREFIX)
+
+
+class MMLUHumanAgingDataLoader(MMLUDataLoader):
+    """DataLoader for MMLU Human Aging dataset"""
+
+    PROMPT_PREFIX = (
+        "You have a multiple choice question on Human Aging. "
+        "Only one of the options is correct: A, B, C, or D. "
+        "Give your answer in the following format with the tags provided: "
+        "<Answer> </Answer>. "
+        "Please read the following question and options and answer the question.\n"
+    )
+
+    def __init__(self, dataset_name="human_aging"):
+        super().__init__(dataset_name=dataset_name, prompt_prefix=self.PROMPT_PREFIX)
+
+
+class MMLUProfessionalLawDataLoader(MMLUDataLoader):
+    """DataLoader for MMLU Professional Law dataset"""
+
+    PROMPT_PREFIX = (
+        "You have a multiple choice question on Professional Law. "
+        "Only one of the options is correct: A, B, C, or D. "
+        "Give your answer in the following format with the tags provided: "
+        "<Answer> </Answer>. "
+        "Please read the following question and options and answer the question.\n"
+    )
+
+    def __init__(self, dataset_name="professional_law"):
+        super().__init__(dataset_name=dataset_name, prompt_prefix=self.PROMPT_PREFIX)
+
+
 class MMLUAbstractAlgebraDataLoader(DataLoader):
     """DataLoader for MMLU Abstract Algebra dataset
 
@@ -847,8 +989,8 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
     )
     PROMPT_SUFFIX = ""
 
-    def __init__(self):
-        super().__init__(dataset_path="lukaemon/mmlu", dataset_name="abstract_algebra")
+    def __init__(self, dataset_name="abstract_algebra"):
+        super().__init__(dataset_path="lukaemon/mmlu", dataset_name=dataset_name)
 
         # Map the training set to incontext prompts
         self.train = concatenate_datasets(
@@ -957,3 +1099,27 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
             out.append({"role": "user", "content": parts[0]})
             out.append({"role": "assistant", "content": parts[1]})
         return out
+
+
+class MMLUMoralScenariosDataLoader(MMLUAbstractAlgebraDataLoader):
+    """Dataloader for MMLU Moral Scenarios dataset
+
+    NOTE: DatasetDict is multiple choice of the form:
+    {train, validation, test} with features: {input, A,B,C,D,target}
+    """
+
+    PROMPT_PREFIX = (
+        "You have a multiple choice question on Moral Scenarios. "
+        "Only one of the options is correct: A, B, C, or D. "
+        # "If you think the answer is A, then say <Answer> A </Answer>. "
+        # "If you think the answer is B, then say <Answer> B </Answer>. "
+        # "If you think the answer is C, then say <Answer> C </Answer>. "
+        # "If you think the answer is D, then say <Answer> D </Answer>. "
+        "Give your answer in the following format with the tags provided: "
+        "<Answer> </Answer>. "
+        # "where option is one of A, B, C, D.\n"
+        "Please read the following question and options and answer the question.\n"
+    )
+
+    def __init__(self):
+        super().__init__(dataset_name="moral_scenarios")
