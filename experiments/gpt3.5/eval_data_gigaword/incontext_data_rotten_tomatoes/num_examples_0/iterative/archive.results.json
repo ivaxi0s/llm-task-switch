@@ -1,0 +1,11 @@
+{
+  "rouge1": 0.03125301126098683,
+  "rouge2": 0.0004310518013774442,
+  "rougeL": 0.028562754379821254,
+  "rougeLsum": 0.02841955180502761,
+  "mean_num_of_chars": 214.389,
+  "model": "gpt3.5",
+  "incontext_set": "rotten_tomatoes",
+  "num_examples": 0,
+  "baseline_likelihood": null
+}
