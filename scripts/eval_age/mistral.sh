@@ -10,7 +10,7 @@ conda activate inctxt
 MODEL_NAME="mistral-7b"
 
 # do not include dailmail, as we have to limit eval_Size
-INCONTEXT_SETS=("mmluaa" "rotten_tomatoes" "tweetqa" "gigaword")
+INCONTEXT_SETS=("mmlu-age" "rotten_tomatoes" "tweetqa" "gigaword")
 
 # For each incontext dataset
 for INCONTEXT_SET in "${INCONTEXT_SETS[@]}"; do
@@ -18,7 +18,7 @@ for INCONTEXT_SET in "${INCONTEXT_SETS[@]}"; do
   for i in {0..6..1}; do
     echo "---Running with $i examples---"
     python main.py \
-      --eval_data_name mmluaa \
+      --eval_data_name mmlu-age \
       --incontext_data_name $INCONTEXT_SET \
       --num_examples $i \
       --model_name $MODEL_NAME \
