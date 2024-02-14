@@ -16,9 +16,7 @@ OPENAI_MODELS = {
     "gpt4": "gpt-4-turbo-preview",
 }
 
-BLABLA_MODELS = {
-    "mixtral": "Mixtral-8x7B-Instruct-v0.1"
-}
+BLABLA_MODELS = {"mixtral": "Mixtral-8x7B-Instruct-v0.1"}
 
 
 class OpenAIModel:
@@ -56,18 +54,18 @@ class OpenAIModel:
         ]
         return [r.choices[0].message.content for r in responses]
 
+
 class BlaBlaModel:
     def __init__(self, model_name):
         self.model_name = model_name
-        self.url = 'https://helmholtz-blablador.fz-juelich.de:8000/v1/chat/completions'
+        self.url = "https://helmholtz-blablador.fz-juelich.de:8000/v1/chat/completions"
         self.headers = {
-            'accept': 'application/json',
-            'Authorization': 'Bearer glpat-4fFjdRCHW98cheMbZt2r',
-            'Content-Type': 'application/json',
+            "accept": "application/json",
+            "Authorization": "Bearer glpat-4fFjdRCHW98cheMbZt2r",
+            "Content-Type": "application/json",
         }
-    
+
     def predict_batch(self, prompt_batch):
-        
         msgs = [{"role": "user", "content": prompt} for prompt in prompt_batch]
         responses = []
         for msg in msgs:
@@ -75,7 +73,7 @@ class BlaBlaModel:
                 "model": BLABLA_MODELS[self.model_name],
                 "messages": msg,
                 "temperature": 0,
-                "top_p":1 ,
+                "top_p": 1,
                 "top_k": -1,
                 "n": 1,
                 "max_tokens": 800,  # Adjust max_tokens as needed
@@ -83,21 +81,24 @@ class BlaBlaModel:
                 "stream": False,
                 "presence_penalty": 0,
                 "frequency_penalty": 0,
-                "user": "string"
+                "user": "string",
             }
 
-            response = requests.post(self.url, headers=self.headers, data=json.dumps(data))
+            response = requests.post(
+                self.url, headers=self.headers, data=json.dumps(data)
+            )
             response_dict = response.json()
-            answer = response_dict['choices'][0]['message']['content']
+            answer = response_dict["choices"][0]["message"]["content"]
             responses.append(answer)
 
         return responses
-    
 
     def predict_batch_iteratively(self, prompt_batch):
         msgs_batches = []
         for prompts in prompt_batch:
-            msgs = [{"role": turn["role"], "content": turn["content"]} for turn in prompts]
+            msgs = [
+                {"role": turn["role"], "content": turn["content"]} for turn in prompts
+            ]
             msgs_batches.append(msgs)
 
         responses = []
@@ -114,13 +115,17 @@ class BlaBlaModel:
                 "stream": False,
                 "presence_penalty": 0,
                 "frequency_penalty": 0,
-                "user": "string"
+                "user": "string",
             }
 
             for _ in range(10):  # Retry up to 5 times
                 try:
-                    response = requests.post(self.url, headers=self.headers, data=json.dumps(data))
-                    response_dict = response.json()  # Raises a JSONDecodeError if the response is empty or not valid JSON
+                    response = requests.post(
+                        self.url, headers=self.headers, data=json.dumps(data)
+                    )
+                    response_dict = (
+                        response.json()
+                    )  # Raises a JSONDecodeError if the response is empty or not valid JSON
                 except json.JSONDecodeError as err:
                     print(f"JSON decoding error occurred: {err}")
                     time.sleep(30)  # Wait for 1 second before retrying
@@ -130,7 +135,7 @@ class BlaBlaModel:
                 print("Failed to get a successful response after 5 attempts")
                 continue  # Skip this iteration and proceed with the next msgs in msgs_batches
             # breakpoint()
-            answer = response_dict['choices'][0]['message']['content']
+            answer = response_dict["choices"][0]["message"]["content"]
             responses.append(answer)
         return responses
 
@@ -257,6 +262,70 @@ class HFModel:
         output_text = output_text.split("[/INST]")[-1]
         # breakpoint()
         return [output_text]
+
+    # @torch.no_grad()
+    # def predict_batch_auto_iterative(self, prompt_batch: list[list[dict]]) -> list[str]:
+    #     """Predict a batch of prompts
+
+    #     Assume
+    #         - prompt_batch is {user, system}
+    #         - the last turn is the user
+    #         - the system responses have been generated previously
+
+    #     """
+    #     # breakpoint()
+    #     if len(prompt_batch) > 1:
+    #         raise ValueError(
+    #             "Batch size cannot be bigger than one for iterative template"
+    #         )
+
+    #     prompts, _ = prompt_batch
+    #     msgs = [{"role": turn["role"], "content": turn["content"]} for turn in prompts]
+
+    #     if len(msgs) < 2:
+    #         raise ValueError(
+    #             "At least two user turns are required for auto iterative template"
+    #         )
+
+    #     # Split the prompts into history and target msgs
+    #     *history, target = msgs
+
+    @torch.no_grad()
+    def response_probabilities(self, history: list[dict], response: str):
+        """Return the likelihood of the response given the history
+
+        Params:
+            history: list[(user, model), ...]
+            response: expected response
+
+        Returns:
+            likelihood: float
+        """
+
+        msgs = [{"role": turn["role"], "content": turn["content"]} for turn in history]
+        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+
+        # Tokenize with the response
+        # breakpoint()
+        msgs.append({"role": "assistant", "content": response})
+        response_tokens = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+        # Extract the response tokens not in the history
+        response_tokens = response_tokens[:, encodeds.shape[-1] :]
+        # response_tokens = self.tokenizer.encode(response, return_tensors="pt")
+        # breakpoint()
+
+        response_probabilities = []
+        # Calculate the likelihood of the response
+        for idx in range(response_tokens.shape[-1]):
+            # Concatenate the history and response_tokens upto idx (excl)
+            inputs = torch.cat([encodeds, response_tokens[:, :idx]], dim=1)
+            inputs = inputs.to(self.device)
+            # Extract logits
+            logits = self.model.forward(input_ids=inputs)["logits"]
+            probs = torch.softmax(logits[0, -1, :].cpu(), dim=-1)
+            # Find the probability of the current response token
+            response_probabilities.append(probs[response_tokens[0, idx]].numpy())
+        return response_probabilities
 
 
 def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel | BlaBlaModel:

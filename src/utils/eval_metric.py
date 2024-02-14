@@ -49,7 +49,11 @@ def evaluate(
         "tweetqa": eval_tweetqa,
         "gsm8k": eval_gsm8k,
         "mmluaa": eval_mmluaa,
+        "moral": eval_mmluaa,
+        "mmlu-math": eval_mmluaa,
     }
+    if "mmlu" in ref_data_name:
+        dataset_eval[ref_data_name] = eval_mmluaa
 
     # evaluate predictions
     if not ref_data_name in dataset_eval:
@@ -60,26 +64,27 @@ def evaluate(
     # include config information in results
     results |= extract_config_from_path(pred_fpath)
     # Calculate baseline likelihood
-    results |= calculate_baseline_likelihood(pred_fpath)
+    results |= calculate_likelihood(pred_fpath)
     # Store results in json in same dir as pred_fpath
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     return results
 
-def calculate_baseline_likelihood(pred_fpath: Path):
+
+def calculate_likelihood(pred_fpath: Path):
     """Calculate the Expected likelihood of the baseline response"""
-    fpath = Path(pred_fpath.parent / "baseline_probabilities.pkl")
-if not fpath.is_file():
-        print(f"Baseline probabilities not found at {fpath}")
-        return {"baseline_likelihood": None}
-    baseline_probabilities = pickle.load(open(fpath, "rb"))
-    breakpoint()
+    fpath = Path(pred_fpath.parent / "base_probabilities.pkl")
+    if not fpath.is_file():
+        print(f"Reference probabilities not found at {fpath}")
+        return {"base_likelihood": None}
+    ref_probs = pickle.load(open(fpath, "rb"))
+    # breakpoint()
     # baseline_probabilities = np.load(fpath)
     # Likelihood is product over all tokens
-    log_likelihood = [np.mean(np.log(probs)) for probs in baseline_probabilities]
+    log_likelihood = [np.mean(np.log(probs)) for probs in ref_probs]
     # Calculate the mean likelihood over all tokens
     log_likelihood = np.mean(log_likelihood)
-    return {"baseline_likelihood": float(log_likelihood)}
+    return {"base_likelihood": float(log_likelihood)}
 
 
 def extract_config_from_path(results_folder: str | Path, subdir="iterative"):
