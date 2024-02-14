@@ -193,6 +193,7 @@ class DataLoader:
 
         if eval_size is None:
             eval_examples = self.test["eval_prompt"]
+            idxs = range(len(self.test))
         elif eval_size > 0:
             if eval_size > len(self.test):
                 print(
@@ -205,8 +206,8 @@ class DataLoader:
         else:
             raise ValueError(f"eval_size must be None or > 0, got {eval_size}")
 
-        for idx, eval_prompt in enumerate(eval_examples):
-            yield idx, eval_prompt
+        for idx, eval_prompt in zip(idxs, eval_examples):
+            yield int(idx), eval_prompt
 
 
 @dataclass
