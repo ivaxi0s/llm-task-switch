@@ -10,23 +10,21 @@ conda activate inctxt
 MODEL_NAME="mistral-7b"
 
 # do not include dailmail, as we have to limit eval_Size
-EVAL_SETS=("rotten_tomatoes" "tweetqa" "gigaword")
+INCONTEXT_SETS=("mmluaa")
 
 # For each incontext dataset
-for EVAL_SET in "${EVAL_SETS[@]}"; do
-  echo "Incontext: $EVAL_SET"
-  for i in {0..10..2}; do
+for INCTXT_SET in "${INCONTEXT_SETS[@]}"; do
+  echo "Incontext: $INCTXT_SET"
+  for i in {0..6..1}; do
     echo "---Running with $i examples---"
     python main.py \
-      --eval_data_name $EVAL_SET \
-      --incontext_data_name rotten_tomatoes \
+      --eval_data_name rotten_tomatoes \
+      --incontext_data_name $INCTXT_SET \
       --num_examples $i \
       --model_name $MODEL_NAME \
       --batchsize 1 \
       --iterative \
       --force_rerun \
-      --no_predict \
-      --likelihoods \
       --gpu_id 1
   done
 done

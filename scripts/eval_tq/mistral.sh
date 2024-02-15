@@ -2,15 +2,16 @@
 # This script runs the experiment
 # test set: tweetqa
 # incontext dataset:
-# model: mistral-7b
+# model: llama-7b
+# NOTE: The test size is *not* limited
 
 conda activate inctxt
 
 MODEL_NAME="mistral-7b"
-INCONTEXT="tweetqa"
+INCONTEXT="mmluaa"
 
 echo "Incontext: $INCONTEXT"
-for i in {0..10..1}; do
+for i in {2..6..2}; do
   echo "---Running with $i examples---"
   python main.py \
     --eval_data_name tweetqa \
@@ -19,6 +20,6 @@ for i in {0..10..1}; do
     --model_name $MODEL_NAME \
     --batchsize 1 \
     --iterative \
-    --force_rerun \
-    --gpu_id 1
+    --gpu_id 2
+  # --force_rerun \
 done
