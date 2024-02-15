@@ -244,19 +244,19 @@ class RottenTomatoesDataLoader(DataLoader):
         # Map all labels to sentiments
         self._dataset = self.dataset.map(RottenTomatoesDataLoader._label_to_sentiment)
         self._dataset = self._dataset.map(
-            RottenTomatoesDataLoader._add_answer_tags, load_from_cache_file=False
+            RottenTomatoesDataLoader._add_answer_tags, load_from_cache_file=True
         )
 
         # Map the training set to incontext prompts
         self.train = self.dataset["train"]
         self.train = self.train.map(
-            RottenTomatoesDataLoader._prompt, load_from_cache_file=False
+            RottenTomatoesDataLoader._prompt, load_from_cache_file=True
         )
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
         self.test = self.test.map(
-            RottenTomatoesDataLoader._eval_prompt, load_from_cache_file=False
+            RottenTomatoesDataLoader._eval_prompt, load_from_cache_file=True
         )
 
     def load_test_reference(self):
@@ -998,22 +998,22 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
             [self.dataset["train"], self.dataset["validation"]]
         )
         self.train = self.train.map(
-            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
+            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=True
         )
         self.train = self.train.map(
-            MMLUAbstractAlgebraDataLoader._prompt, load_from_cache_file=False
+            MMLUAbstractAlgebraDataLoader._prompt, load_from_cache_file=True
         )
 
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._eval_prompt, load_from_cache_file=False
+            MMLUAbstractAlgebraDataLoader._eval_prompt, load_from_cache_file=True
         )
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=False
+            MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=True
         )
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
+            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=True
         )
 
     @staticmethod

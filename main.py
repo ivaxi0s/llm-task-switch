@@ -82,7 +82,7 @@ if __name__ == "__main__":
             for i in tqdm(range(0, len(prompts), core_args.batchsize)):
                 # batch prompts
                 prompt_batch = prompts[i : i + core_args.batchsize]
-                breakpoint()
+                # breakpoint()
                 if eval_args.iterative:
                     predictions.extend(model.predict_batch_iteratively(prompt_batch))
                 else:
@@ -92,24 +92,40 @@ if __name__ == "__main__":
             if not eval_args.no_predict:
                 with open(model_output_file, "w") as f:
                     json.dump(predictions, f)
-        
+
         if eval_args.likelihoods:
             print("Computing likelihoods")
             if not eval_args.iterative:
-                raise ValueError("Likelihoods can only be computed for iterative prompts")
+                raise ValueError(
+                    "Likelihoods can only be computed for iterative prompts"
+                )
             # Load the predictions for 0 in-context examples
-            baseline_predictions_file = base_path.parent.parent / "num_examples_0" / "iterative"/ "predictions.json"
+            baseline_predictions_file = (
+                base_path.parent.parent
+                / "num_examples_0"
+                / "iterative"
+                / "predictions.json"
+            )
             with open(baseline_predictions_file, "r") as f:
                 baseline_predictions: list[str] = json.load(f)
             if len(baseline_predictions) != len(prompts):
-                raise ValueError("Baseline predictions and prompts are not the same length")
+                raise ValueError(
+                    "Baseline predictions and prompts are not the same length"
+                )
 
             baseline_likelihoods = []
-            for response, prompt in tqdm(zip(baseline_predictions, prompts), total=len(prompts)):
-                baseline_likelihoods.append(model.response_probabilities(prompt, response))
-            
+            for response, prompt in tqdm(
+                zip(baseline_predictions, prompts), total=len(prompts)
+            ):
+                baseline_likelihoods.append(
+                    model.response_probabilities(prompt, response)
+                )
+
             # Save the baseline probabilities using pickle
-            pickle.dump(baseline_likelihoods, open(base_path / "baseline_probabilities.pkl", "wb"))
+            pickle.dump(
+                baseline_likelihoods,
+                open(base_path / "base_probabilities.pkl", "wb"),
+            )
             # np.save(base_path / "baseline_probabilities.npy", baseline_likelihoods)
 
     # Evaluate the performance
@@ -119,6 +135,7 @@ if __name__ == "__main__":
             eval_idxs = json.load(f)
             print(f"Loaded eval idxs: {len(eval_idxs)}")
     else:
+        print("No eval idxs file found. Defaulting to entire test set.")
         eval_idxs = None
 
     reference_data = pl.load_testdata(eval_idxs)
