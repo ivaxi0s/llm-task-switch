@@ -16,8 +16,6 @@ OPENAI_MODELS = {
     "gpt4": "gpt-4-turbo-preview",
 }
 
-BLABLA_MODELS = {"mixtral": "Mixtral-8x7B-Instruct-v0.1"}
-
 
 class OpenAIModel:
     """Class wrapper for models that interacts with an API"""
@@ -53,91 +51,6 @@ class OpenAIModel:
             for msgs in msgs_batches
         ]
         return [r.choices[0].message.content for r in responses]
-
-
-class BlaBlaModel:
-    def __init__(self, model_name):
-        self.model_name = model_name
-        self.url = "https://helmholtz-blablador.fz-juelich.de:8000/v1/chat/completions"
-        self.headers = {
-            "accept": "application/json",
-            "Authorization": "Bearer glpat-4fFjdRCHW98cheMbZt2r",
-            "Content-Type": "application/json",
-        }
-
-    def predict_batch(self, prompt_batch):
-        msgs = [{"role": "user", "content": prompt} for prompt in prompt_batch]
-        responses = []
-        for msg in msgs:
-            data = {
-                "model": BLABLA_MODELS[self.model_name],
-                "messages": msg,
-                "temperature": 0,
-                "top_p": 1,
-                "top_k": -1,
-                "n": 1,
-                "max_tokens": 800,  # Adjust max_tokens as needed
-                "stop": ["string"],
-                "stream": False,
-                "presence_penalty": 0,
-                "frequency_penalty": 0,
-                "user": "string",
-            }
-
-            response = requests.post(
-                self.url, headers=self.headers, data=json.dumps(data)
-            )
-            response_dict = response.json()
-            answer = response_dict["choices"][0]["message"]["content"]
-            responses.append(answer)
-
-        return responses
-
-    def predict_batch_iteratively(self, prompt_batch):
-        msgs_batches = []
-        for prompts in prompt_batch:
-            msgs = [
-                {"role": turn["role"], "content": turn["content"]} for turn in prompts
-            ]
-            msgs_batches.append(msgs)
-
-        responses = []
-        for msgs in msgs_batches:
-            data = {
-                "model": BLABLA_MODELS[self.model_name],
-                "messages": msgs,
-                "temperature": 0,
-                "top_p": 1,
-                "top_k": -1,
-                "n": 1,
-                "max_tokens": 3000,  # Adjust max_tokens as needed
-                "stop": ["string"],
-                "stream": False,
-                "presence_penalty": 0,
-                "frequency_penalty": 0,
-                "user": "string",
-            }
-
-            for _ in range(10):  # Retry up to 5 times
-                try:
-                    response = requests.post(
-                        self.url, headers=self.headers, data=json.dumps(data)
-                    )
-                    response_dict = (
-                        response.json()
-                    )  # Raises a JSONDecodeError if the response is empty or not valid JSON
-                except json.JSONDecodeError as err:
-                    print(f"JSON decoding error occurred: {err}")
-                    time.sleep(30)  # Wait for 1 second before retrying
-                else:
-                    break  # Exit the loop if the request is successful
-            else:
-                print("Failed to get a successful response after 5 attempts")
-                continue  # Skip this iteration and proceed with the next msgs in msgs_batches
-            # breakpoint()
-            answer = response_dict["choices"][0]["message"]["content"]
-            responses.append(answer)
-        return responses
 
 
 class HFModel:
@@ -338,8 +251,6 @@ def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel | BlaBlaMod
             device=get_default_device(gpu_id),
             model_name=model_name,
         )
-    elif model_name in BLABLA_MODELS.keys():
-        model = BlaBlaModel(model_name)
     else:
         raise ValueError(
             f"Unknown model name {model_name}"
