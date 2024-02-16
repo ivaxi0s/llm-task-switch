@@ -239,6 +239,7 @@ class HFModel:
             msgs.append({"role": turn["role"], "content": turn["content"]})
 
         encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+        # return [encodeds.shape[-1]] # Debug token length
         # breakpoint()
 
         inputs = encodeds.to(self.device)

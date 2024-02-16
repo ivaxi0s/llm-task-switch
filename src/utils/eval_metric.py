@@ -64,27 +64,52 @@ def evaluate(
     # include config information in results
     results |= extract_config_from_path(pred_fpath)
     # Calculate baseline likelihood
-    results |= calculate_likelihood(pred_fpath)
+    results |= calculate_likelihood(pred_fpath, ref_data_name)
     # Store results in json in same dir as pred_fpath
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     return results
 
 
-def calculate_likelihood(pred_fpath: Path):
+def calculate_likelihood(pred_fpath: Path, ref_data_name: str):
     """Calculate the Expected likelihood of the baseline response"""
-    fpath = Path(pred_fpath.parent / "base_probabilities.pkl")
-    if not fpath.is_file():
-        print(f"Reference probabilities not found at {fpath}")
-        return {"base_likelihood": None}
-    ref_probs = pickle.load(open(fpath, "rb"))
-    # breakpoint()
-    # baseline_probabilities = np.load(fpath)
-    # Likelihood is product over all tokens
-    log_likelihood = [np.mean(np.log(probs)) for probs in ref_probs]
-    # Calculate the mean likelihood over all tokens
-    log_likelihood = np.mean(log_likelihood)
-    return {"base_likelihood": float(log_likelihood)}
+    fpaths = {
+        "base_likelihood": pred_fpath.parent / "base_probabilities.pkl",
+        "final_likelihood": pred_fpath.parent / "final_probabilities.pkl",
+        "ref_likelihood": pred_fpath.parent / "ref_probabilities.pkl",
+    }
+
+    # fpath = Path(pred_fpath.parent / "base_probabilities.pkl")
+    results = {}
+
+    # Check which model this is
+    model_name = pred_fpath.parent.parent.parent.parent.parent.name
+    breakpoint()
+
+    for key, fpath in fpaths.items():
+        if not fpath.is_file():
+            print(f"Reference probabilities not found at {fpath}")
+            results[key] = None
+            continue
+        ref_probs = pickle.load(open(fpath, "rb"))
+        # breakpoint()
+        # baseline_probabilities = np.load(fpath)
+        # Likelihood is product over all tokens
+        # log_likelihood = [np.mean(np.log(probs)) for probs in ref_probs]
+        breakpoint()
+        if (
+            model_name
+            == "llama-7b"
+            # and ref_data_name == "rotten_tomatoes"
+            # and key == "base_likelihood"
+        ):
+            # remove the first token prob
+            ref_probs = [probs[1:] for probs in ref_probs]
+        log_likelihood = [float(np.sum(np.log(probs))) for probs in ref_probs]
+        # Calculate the mean likelihood over all tokens
+        # log_likelihood = np.mean(log_likelihood)
+        results[key] = log_likelihood
+    return results
 
 
 def extract_config_from_path(results_folder: str | Path, subdir="iterative"):

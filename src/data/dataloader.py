@@ -119,7 +119,7 @@ class PromptLoader:
 
         return eval_idxs, prompts
 
-    def load_testdata(self, eval_idxs) -> list[str]:
+    def load_testdata(self, eval_idxs: list[int] | None) -> list[str]:
         """Return the test data reference as a list[str]
 
         This is used for evaluation
@@ -882,6 +882,10 @@ class MMLUDataLoader(DataLoader):
 
     def load_test_reference(self):
         return self.test["target_text"]
+
+    def load_likelihood_reference(self):
+        """Return the test data as a list[str] to be used for likelihood calculation"""
+        return self.test["target_with_tags"]
 
     @staticmethod
     def _eval_prompt(example: dict[str, Any], prompt_prefix: str) -> dict[str, str]:

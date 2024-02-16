@@ -88,6 +88,7 @@ if __name__ == "__main__":
                 else:
                     predictions.extend(model.predict_batch(prompt_batch))
 
+            # breakpoint()
             # Save the predictions
             if not eval_args.no_predict:
                 with open(model_output_file, "w") as f:
