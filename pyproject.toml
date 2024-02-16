@@ -2,9 +2,7 @@
 name = "inctxt"
 version = "0.0.1"
 authors = [
-  { name = "Akash Gupta", email = "guptaalgebra@gmail.com" },
-  { name = "Ivaxi Sheth" },
-  { name = "Vyas Raina" },
+  { name = "X", email = "X@X.com" },
 ]
 dependencies = [
   "torch",
