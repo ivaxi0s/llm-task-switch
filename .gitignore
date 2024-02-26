@@ -15,10 +15,16 @@ prompts.json
 # !experiments/**/iterative/predictions.json
 *.pkl
 
+# noop experiments
+eval_data_mmlu-law/
+eval_data_mmlu-math/
+mixtral/*
+
 .env
 .idea/
 .archive/
 .vscode/
+.hpc/
 
 *.egg-info/
 .ipynb_checkpoints/
