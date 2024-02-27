@@ -1,9 +1,6 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM  # type: ignore
 import torch
 import openai
-import requests
-import json
-import time
 from src.tools.tools import get_default_device
 
 HF_MODEL_URLS = {
@@ -24,7 +21,7 @@ class OpenAIModel:
         self.model_name = model_name
         self.client = openai
 
-    def predict_batch(self, prompt_batch: list[str]) -> list[str]:
+    def predict_batch(self, prompt_batch: list[dict]) -> list[str]:
         """Predict a batch of prompts"""
         msgs = [{"role": "user", "content": prompt} for prompt in prompt_batch]
         responses = [
@@ -35,7 +32,7 @@ class OpenAIModel:
         ]
         return [r.choices[0].message.content for r in responses]
 
-    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+    def predict_batch_iteratively(self, prompt_batch: list[dict]) -> list[str]:
         """Predict a batch of prompts"""
         msgs_batches = []
         for prompts in prompt_batch:
@@ -66,8 +63,6 @@ class HFModel:
 
         self.max_new_tokens = 512  # Twice the 99.9th percentile of train set summaries
         print(f"Max new tokens: {self.max_new_tokens}")
-
-        # TODO: check if model outputs input prompt tokens or just the ouptut
 
     def predict_batch(self, prompt_batch: list[str]) -> list[str]:
         """
@@ -134,7 +129,7 @@ class HFModel:
         ).strip()
         return output_text
 
-    def predict_batch_iteratively(self, prompt_batch: list[str]) -> list[str]:
+    def predict_batch_iteratively(self, prompt_batch: list[dict]) -> list[str]:
         """
         in context examples are passed iteratively
         assume prompt-batch is batch size x number_of_conversation_turns (role specified)
@@ -242,8 +237,9 @@ class HFModel:
         return response_probabilities
 
 
-def get_model(model_name: str, gpu_id: str) -> HFModel | OpenAIModel | BlaBlaModel:
+def get_model(model_name: str, gpu_id: int) -> HFModel | OpenAIModel:
     """Load / intialise the model and return it"""
+    model: OpenAIModel | HFModel
     if model_name in OPENAI_MODELS.keys():
         model = OpenAIModel(model_name)
     elif model_name in HF_MODEL_URLS.keys():

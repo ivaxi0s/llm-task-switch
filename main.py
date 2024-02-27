@@ -1,10 +1,26 @@
+"""Evaluate task-switch inference on a model and evaluate its performance.
+
+Optional Flags:
+    --eval_size (generally 1000)
+    --no_predict    # useful to debug prompts without running the model
+    --force_rerun   # force rerun of model predictions, otherwise load results from cache
+
+Required Flags:
+    --iterative
+    --batchsize 1 (default)
+    
+Args:
+    --num_examples <int>
+    --eval_data_name <str>
+    --incontext_data_name <str>
+    --model_name <str>
+"""
+
 import sys
 import os
 from pathlib import Path
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore
 import json
-import numpy as np
-import pickle
 
 MAIN_PATH = Path(os.path.dirname(os.path.realpath(__file__)))
 EVAL_IDXS_FILE = "eval_idxs.json"
@@ -13,10 +29,10 @@ EVAL_IDXS_FILE = "eval_idxs.json"
 from src.tools.args import ModelArgs, EvalArgs
 from src.tools.tools import set_seeds
 from src.tools.saving import base_path_creator
-from src.utils.eval_metric import evaluate
+from src.eval.eval_metric import evaluate
 from src.inference.models import get_model
 from dotenv import load_dotenv
-from src.data.dataloader import PromptLoader
+from src.data.promptloader import PromptLoader
 
 load_dotenv()
 # print(os.environ["HF_HOME"])
@@ -93,41 +109,6 @@ if __name__ == "__main__":
             if not eval_args.no_predict:
                 with open(model_output_file, "w") as f:
                     json.dump(predictions, f)
-
-        if eval_args.likelihoods:
-            print("Computing likelihoods")
-            if not eval_args.iterative:
-                raise ValueError(
-                    "Likelihoods can only be computed for iterative prompts"
-                )
-            # Load the predictions for 0 in-context examples
-            baseline_predictions_file = (
-                base_path.parent.parent
-                / "num_examples_0"
-                / "iterative"
-                / "predictions.json"
-            )
-            with open(baseline_predictions_file, "r") as f:
-                baseline_predictions: list[str] = json.load(f)
-            if len(baseline_predictions) != len(prompts):
-                raise ValueError(
-                    "Baseline predictions and prompts are not the same length"
-                )
-
-            baseline_likelihoods = []
-            for response, prompt in tqdm(
-                zip(baseline_predictions, prompts), total=len(prompts)
-            ):
-                baseline_likelihoods.append(
-                    model.response_probabilities(prompt, response)
-                )
-
-            # Save the baseline probabilities using pickle
-            pickle.dump(
-                baseline_likelihoods,
-                open(base_path / "base_probabilities.pkl", "wb"),
-            )
-            # np.save(base_path / "baseline_probabilities.npy", baseline_likelihoods)
 
     # Evaluate the performance
     # Check if eval idxs exists (if not, use the entire test set)

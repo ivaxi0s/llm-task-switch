@@ -34,9 +34,10 @@ def evaluate(
             return json.load(f)
 
     if ref_data_name is None:
-        ref_data_name = RE_EVAL_DATA.match(
-            pred_fpath.parent.parent.parent.parent.name
-        ).group(1)
+        m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.name)
+        if m is None:
+            raise ValueError(f"Could not extract eval data name from {pred_fpath}")
+        ref_data_name = m.group(1)
 
     # load predictions from cache
     with open(pred_fpath, "r") as f:
@@ -80,11 +81,10 @@ def calculate_likelihood(pred_fpath: Path, ref_data_name: str):
     }
 
     # fpath = Path(pred_fpath.parent / "base_probabilities.pkl")
-    results = {}
+    results: dict = {}
 
     # Check which model this is
     model_name = pred_fpath.parent.parent.parent.parent.parent.name
-    breakpoint()
 
     for key, fpath in fpaths.items():
         if not fpath.is_file():
@@ -92,22 +92,18 @@ def calculate_likelihood(pred_fpath: Path, ref_data_name: str):
             results[key] = None
             continue
         ref_probs = pickle.load(open(fpath, "rb"))
-        # breakpoint()
-        # baseline_probabilities = np.load(fpath)
-        # Likelihood is product over all tokens
-        # log_likelihood = [np.mean(np.log(probs)) for probs in ref_probs]
-        breakpoint()
-        if (
-            model_name
-            == "llama-7b"
-            # and ref_data_name == "rotten_tomatoes"
-            # and key == "base_likelihood"
-        ):
+
+        # Remove the first-token probability in llama, because it is spurious
+        if model_name == "llama-7b":
             # remove the first token prob
             ref_probs = [probs[1:] for probs in ref_probs]
-        log_likelihood = [float(np.sum(np.log(probs))) for probs in ref_probs]
-        # Calculate the mean likelihood over all tokens
-        # log_likelihood = np.mean(log_likelihood)
+
+        # Likelihood is product over all tokens
+        # log_likelihood = [float(np.sum(np.log(probs))) for probs in ref_probs]
+
+        # Likelihood is mean over all tokens
+        log_likelihood = [float(np.mean(np.log(probs))) for probs in ref_probs]
+
         results[key] = log_likelihood
     return results
 
@@ -125,6 +121,7 @@ def extract_config_from_path(results_folder: str | Path, subdir="iterative"):
         results_folder = results_folder.parent
     if results_folder.name == subdir:
         results_folder = results_folder.parent
+
     return {
         "model": results_folder.parent.parent.parent.name,
         "incontext_set": RE_INCTXT.match(results_folder.parent.name).group(1),
@@ -180,10 +177,6 @@ def eval_rt(pred_data: list[str], ref_data: list[str]):
         "failed": failed,
         "total": len(pred_data),
     }
-    # return {
-    #     "Accuracy": f"{matches/(len(pred_data)-failed)*100:.2f}% \
-    #         ({matches}/{len(pred_data)-failed} samples)"
-    # }
 
 
 def eval_gigaword(pred_data, ref_data):
@@ -192,7 +185,6 @@ def eval_gigaword(pred_data, ref_data):
 
     rouge = hf_evl.load("rouge")
 
-    # rouge = load_metric("rouge")
     scores = rouge.compute(predictions=pred_data, references=ref_data)
     scores |= {"mean_num_of_chars": mean_num_of_characters(pred_data)}
 
@@ -205,7 +197,6 @@ def eval_dailymail(pred_data, ref_data):
 
     rouge = hf_evl.load("rouge")
 
-    # rouge = load_metric("rouge")
     scores = rouge.compute(predictions=pred_data, references=ref_data)
     scores |= {"mean_num_of_chars": mean_num_of_characters(pred_data)}
 

@@ -1,12 +1,14 @@
 """There are three different likelihoods that can be computed:
 
-Args:
+Required Flags:
     --iterative
     --likelihoods
-    --num_examples #
+
+Args:
+    --num_examples <int>
     --eval_size (generally 100)
-    --eval_data_name
-    --incontext_data_name
+    --eval_data_name <str>
+    --incontext_data_name <str>
 
 When running the script, we calculate the likelihoods for the following three cases:
 1. P(r_0 | u, h_L) : The likelihood of the original response given the prompt and the final context
@@ -27,17 +29,17 @@ the likelihoods are hence calculated for the following:
 
 These can be combined to calculate the following:
 
-Sensitivity in predicting the original response:
+_zero-shot sensitivity_: Sensitivity in predicting the original response
 P(r_0 | u, h_L)
 ----------------
 P(r_0 | u)
 
-Confidence in the final prediction:
+_confidence sensitivity_: Confidence in the final prediction
 P(r_L | u, h_L)
 ----------------
 P(r_0 | u)
 
-Predicting the reference response
+_loss sensitivity_: Predicting the reference response
 P(r_ref | u, h_L)
 ----------------
 P(r_ref | u)
@@ -46,7 +48,7 @@ P(r_ref | u)
 import sys
 import os
 from pathlib import Path
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore
 import json
 import numpy as np
 import pickle
@@ -54,10 +56,10 @@ import pickle
 from src.tools.args import ModelArgs, EvalArgs
 from src.tools.tools import set_seeds
 from src.tools.saving import base_path_creator
-from src.utils.eval_metric import evaluate
-from src.inference.models import get_model
+from src.eval.eval_metric import evaluate
+from src.inference.models import get_model, HFModel
 from dotenv import load_dotenv
-from src.data.dataloader import PromptLoader
+from src.data.promptloader import PromptLoader
 
 MAIN_PATH = Path(os.path.dirname(os.path.realpath(__file__)))
 EVAL_IDXS_FILE = "eval_idxs.json"
@@ -143,26 +145,6 @@ else:
     # 1. Load the predictions for 0 in-context examples
     baseline_predictions = get_predictions_from_idxs(eval_idxs, 0)
 
-    # baseline_predictions_file = (
-    #     base_path.parent.parent / "num_examples_0" / "iterative" / "predictions.json"
-    # )
-    # with open(baseline_predictions_file, "r") as f:
-    #     baseline_predictions: list[str] = json.load(f)
-
-    # # Load the indexes for the 0 in-context examples
-    # baseline_idxs_file = (
-    #     base_path.parent.parent / "num_examples_0" / "iterative" / EVAL_IDXS_FILE
-    # )
-    # with open(baseline_idxs_file, "r") as f:
-    #     baseline_idxs = json.load(f)
-
-    # Get the baseline predictions corresponding to the current eval_idxs
-    # baseline_relative_idxs = [baseline_idxs.index(i) for i in eval_idxs]
-    # baseline_predictions = [baseline_predictions[i] for i in baseline_relative_idxs]
-
-    # if len(baseline_predictions) != len(prompts):
-    #     raise ValueError("Baseline predictions and prompts are not the same length")
-
     # 2. Load the predictions for the current number of examples
     final_predictions = get_predictions_from_idxs(eval_idxs, eval_args.num_examples)
 
@@ -187,6 +169,8 @@ else:
     # Initialise / load model
     print(f"Loading model: {core_args.model_name}")
     model = get_model(core_args.model_name, core_args.gpu_id)
+    if not isinstance(model, HFModel):
+        raise ValueError("Model must be an HFModel")
 
     print("Computing likelihoods")
     baseline_likelihoods = []
