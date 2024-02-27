@@ -138,7 +138,7 @@ We support instruction tuned models from Hugging Face and Open AI. The `<model>`
 | `"mistral-7b"` | `"mistralai/Mistral-7B-Instruct-v0.1"` | Hugging Face |
 | `"llama-7b"`   | `"meta-llama/Llama-2-7b-chat-hf"`      | Hugging Face |
 | `"gpt3.5"`     | `"gpt-3.5-turbo"`                      | Open AI      |
-| `"gpt4"`       | `"gpt-4-turbo-preview"`                | Open AI      |
+| `"gpt4"`       | `"gpt-4"`                              | Open AI      |
 
 
 To run GPT3.5 / GPT4, an openAI API key is required. Specify this in a `.env` file such as:
