@@ -1,6 +1,6 @@
 # LLM Task-Switch
 
-> Evaluating LLM performance and sensitivity when there is a "task-switch"
+_Evaluating LLM performance and sensitivity when there is a "task-switch"_
 
 **Motivation**
 
@@ -8,11 +8,11 @@ Typically, when an LLM responds to a user prompt, the model conditions itself ba
 
 <!-- ![Task-Switch](task-switch-2.png "Task-Switch") -->
 
-<img src="task-switch-2.png" alt="Task-Switch" height="300">
+<img src="task-switch-2.png" alt="Task-Switch" width="300">
 
 > Figure 1: An illustrative example of _task-switch_. \
-> **Top**: The chat history is based on sentiment prediction. Algebra word problem introduces a _task-switch_, which results in an incorrect prediction. \
-> **Bottom**: The LLM is well behaved when there is no conversation history.
+> **Top** box: The chat history is based on sentiment prediction. Algebra word problem introduces a _task-switch_, which results in an incorrect prediction. \
+> **Bottom** box: The LLM is well behaved when there is no conversation history.
 
 ### Jargon
 
@@ -20,7 +20,7 @@ We use the example above to define some terms used throughout the repository:
 
 - A _turn_ consists of a _user prompt_ $u$, and a _system response_ $r$. 
   - In the example above, the **Top** box shows 3 turn, while the **Bottom** box has _1_ turn. 
-- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{\underbrace{(u_k, r_k)}_{\text{turn}}\}_{k = 1}^{L}$, where $L$ is the length of the conversation history. 
+- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{\underbrace{(u_k, r_k)}_{\mathrm{turn}}\}_{k = 1}^{L}$, where $L$ is the length of the conversation history. 
   - In the example above, the **Top** box has a conversation history length $L = 2$, where as the bottom box has no conversation history $L = 0$. This is equivalent to a _"zero-shot"_ setting.
 - _`incontext_data`_ : This is the dataset used to provide teacher-forced examples to form a _conversation history_.
   - In the example above, this dataset is the one for "Sentiment Prediction" (e.g. [rotten tomatoes](https://huggingface.co/datasets/rotten_tomatoes))
@@ -72,8 +72,8 @@ Install the relevant conda dependencies from `environment.yaml` and python packa
 There are two entry points for the code: [`main.py`](main.py) and [`likelihoods.py`](likelihoods.py). 
 - All args that can be specified can be found in [src/tools/args.py](src/tools/args.py)
   - Args are also documented below and in the entry point files
-- Models can be found in [src/inference/models.py](src/inference/models.py) (See [models section](###Models) for more details)
-- Datasets can be found in [src/data/dataloader.py](src/data/dataloader.py) (See [datasets section](###Datasets) for more details)
+- Models can be found in [src/inference/models.py](src/inference/models.py) (See [models section](###models) for more details)
+- Datasets can be found in [src/data/dataloader.py](src/data/dataloader.py) (See [datasets section](###datasets) for more details)
 - Results are plot using the notebook in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb)
 
 ### Saving results
@@ -97,8 +97,8 @@ python main.py \
 ```
 
 - For zero-shot performance, use `--num_examples 0`
-- To specify a dataset, see the [datasets section](###Datasets)
-- To specify a model, see the [models section](###Models)
+- To specify a dataset, see the [datasets section](###datasets)
+- To specify a model, see the [models section](###models)
 
 Optionally, the following args can be specified
 

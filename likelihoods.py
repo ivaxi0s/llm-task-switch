@@ -7,8 +7,9 @@ Required Flags:
 Args:
     --num_examples <int>
     --eval_size (generally 100)
-    --eval_data_name <str>
-    --incontext_data_name <str>
+    --eval_data_name <dataset>
+    --incontext_data_name <dataset>
+    --model_name <model>
 
 When running the script, we calculate the likelihoods for the following three cases:
 1. P(r_0 | u, h_L) : The likelihood of the original response given the prompt and the final context

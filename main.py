@@ -11,9 +11,9 @@ Required Flags:
     
 Args:
     --num_examples <int>
-    --eval_data_name <str>
-    --incontext_data_name <str>
-    --model_name <str>
+    --eval_data_name <dataset>
+    --incontext_data_name <dataset>
+    --model_name <model>
 """
 
 import sys
