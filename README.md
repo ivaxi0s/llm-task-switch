@@ -6,8 +6,6 @@ _Evaluating LLM performance and sensitivity when there is a "task-switch"_
 
 Typically, when an LLM responds to a user prompt, the model conditions itself based on the prior conversation history to provide some basic short-term memory. Generally, this sensitivity to the history is efficacious, but can be counteractive when there is a "task-switch". In this repo, we evaluate the performance of models when switching tasks.
 
-<!-- ![Task-Switch](task-switch-2.png "Task-Switch") -->
-
 <img src="task-switch-2.png" alt="Task-Switch" width="300">
 
 > Figure 1: An illustrative example of _task-switch_. \
@@ -20,7 +18,7 @@ We use the example above to define some terms used throughout the repository:
 
 - A _turn_ consists of a _user prompt_ $u$, and a _system response_ $r$. 
   - In the example above, the **Top** box shows 3 turn, while the **Bottom** box has _1_ turn. 
-- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{\underbrace{(u_k, r_k)}_{\mathrm{turn}}\}_{k = 1}^{L}$, where $L$ is the length of the conversation history. 
+- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{(u_k, r_k)\}_{k = 1}^{L}$, where $L$ is the length of the conversation history. 
   - In the example above, the **Top** box has a conversation history length $L = 2$, where as the bottom box has no conversation history $L = 0$. This is equivalent to a _"zero-shot"_ setting.
 - _`incontext_data`_ : This is the dataset used to provide teacher-forced examples to form a _conversation history_.
   - In the example above, this dataset is the one for "Sentiment Prediction" (e.g. [rotten tomatoes](https://huggingface.co/datasets/rotten_tomatoes))
@@ -33,7 +31,7 @@ After running experiments (or using our results), you can reproduce the plots sh
 
 ### Performance change due to Task-Switch
 
-We calculate the percentage change in peformance relative to zero-shot using the function `df_metric_pct_change()`. This gives results as below:
+We calculate the percentage change in peformance relative to zero-shot using the function `df_metric_pct_change()`:
 
 <img src="results/mmluaa/accuracy.png" alt="MMLU Abstract Algebra Task-Switch" width="900">
 
@@ -42,6 +40,8 @@ We calculate the percentage change in peformance relative to zero-shot using the
 > However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to a task-switch.
 
 ### Sensitivity due to Task-Switch
+
+We calculate the sensitivity in peformance relative to zero-shot using the function `expectation_metrics()`:
 
 <img src="results/mmluaa/sensitivity.png" alt="Sensitivity on Task-Switch to MMLU Abstract Algebra" width="900">
 
