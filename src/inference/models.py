@@ -10,7 +10,7 @@ HF_MODEL_URLS = {
 
 OPENAI_MODELS = {
     "gpt3.5": "gpt-3.5-turbo",
-    "gpt4": "gpt-4-turbo-preview",
+    "gpt4": "gpt-4",
 }
 
 
