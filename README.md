@@ -175,5 +175,19 @@ The datasets that can be used are shown in the table below, alongside their sour
 Dailymail examples have a large number of tokens, which is a problem when evaluating with `llama-7b` as it has a max token length of `4096`. In `./src/data/dataloader.py::DataLoader::remove_large_dataset_examples()`, we limit the size of each `user-system` conversation in the conversation history to be less than `1792`, allowing for a conversation history length $L=2$ with some remaining tokens for the target task. 
 
 
-## Cite
+## Reference
 
+If you use Task-Switch, or scripts provided in this repository (eg., evaluation scripts) in your work, please cite the following paper:
+
+```bibtex
+@misc{taskswitch2024,
+      title={LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History}, 
+      author={Akash Gupta and Ivaxi Sheth and Vyas Raina and Mark Gales and Mario Fritz},
+      year={2024},
+      eprint={2402.18216},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL}
+}
+```
+
+**Arxiv pre-print**: https://arxiv.org/abs/2402.18216
