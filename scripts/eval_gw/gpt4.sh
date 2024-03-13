@@ -1,15 +1,14 @@
 #!/bin/bash
 # This script runs the experiment
-# test set: mmluaa
+# test set: gigaword
 # incontext dataset:
-# model: mistral-7b
-# NOTE: The test size is *not* limited
+# model: gpt4
+# NOTE: The test size can be limited to 1000
 
 conda activate inctxt
 
 MODEL_NAME="gpt4"
 
-# do not include dailmail, as we have to limit eval_Size
 INCONTEXT_SETS=("gigaword" "rotten_tomatoes" "tweetqa" "mmluaa")
 
 # For each incontext dataset
@@ -28,6 +27,5 @@ for INCONTEXT_SET in "${INCONTEXT_SETS[@]}"; do
       --gpu_id 1
     # --eval_size 1000 \
     # --force_rerun \
-    # --likelihoods \
   done
 done
