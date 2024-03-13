@@ -24,7 +24,10 @@ mixtral/*
 .idea/
 .archive/
 .vscode/
-.hpc/
+hpc/
+cache/
+scripts/*.sh
+scripts/**/*.sh
 
 *.egg-info/
 .ipynb_checkpoints/
