@@ -5,12 +5,17 @@ import evaluate as hf_evl  # type: ignore
 import numpy as np
 import pickle
 from typing import Callable
+from transformers import AutoTokenizer  # type: ignore
+
 
 # RE patterns for extracting config information from results folder path
 RE_INCTXT = re.compile(r"^incontext_data_(.*)")  # Extract in context set
 RE_NUM_EXAMPLES = re.compile(r"^num_examples_(.*)")  # Extract number of examples
 RE_EVAL_DATA = re.compile(r"^eval_data_(.*)")  # Extract eval data name
 RE_ANSWER_TAGS = re.compile(r"<Answer>(.*?)</Answer>")
+
+llama_tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+mistral_tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.1")
 
 
 def get_dataset_eval_func(dataset: str) -> Callable:
@@ -80,6 +85,10 @@ def evaluate(
     results |= extract_config_from_path(pred_fpath)
     # Calculate baseline likelihood
     results |= calculate_likelihood(pred_fpath, ref_data_name)
+
+    # Calculate token lengths
+    results |= calculate_token_size(pred_fpath, results["model"])
+
     # Store results in json in same dir as pred_fpath
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
@@ -137,6 +146,65 @@ def evaluate_converse(
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     return results
+
+
+def calculate_token_size(pred_fpath: Path, model: str):
+    """Return the mean token size of prompts, predictions and full conversation
+
+    Args:
+        pred_fpath: ...dir/predictions.json
+    """
+    tokens = {}
+    if model == "llama-7b":
+        tokenizer = llama_tokenizer
+    elif model == "mistral-7b":
+        tokenizer = mistral_tokenizer
+    else:
+        return tokens
+
+    # load predictions
+    with open(pred_fpath, "r") as f:
+        pred_data = json.load(f)
+        pred_tokens_length = tokenizer(
+            pred_data,
+            return_attention_mask=False,
+            return_length=True,
+        )["length"]
+        pred_tokens_length = np.mean(pred_tokens_length)
+
+    # load prompts
+    prompt_fpath = pred_fpath.parent / "prompts.json"
+    with open(prompt_fpath, "r") as f:
+        prompt_data = json.load(f)
+        # check if conversation history length is 0
+        if len(prompt_data[0]) == 1:
+            conversation_history_length = 0
+        else:
+            conversation_history_length = [
+                len(tokenizer.apply_chat_template(prompt[:-1]))
+                for prompt in prompt_data
+            ]
+            conversation_history_length = np.mean(conversation_history_length)
+        # prompt_tokens_length = [
+        #     len(tokenizer.apply_chat_template(prompt)) for prompt in prompt_data
+        # ]
+        # prompt_tokens_length = np.mean(prompt_tokens_length)
+        target_task_length = [
+            len(tokenizer.apply_chat_template(prompt[-1:])) for prompt in prompt_data
+        ]
+        target_task_length = np.mean(target_task_length)
+
+    tokens |= {
+        # "mean_prompt_tokens_length": prompt_tokens_length,
+        "mean_conversation_history_length": conversation_history_length,
+        "mean_target_task_length": target_task_length,
+        "mean_pred_tokens_length": pred_tokens_length,
+        "mean_conversation_length": conversation_history_length
+        + target_task_length
+        + pred_tokens_length,
+    }
+
+    return tokens
 
 
 def calculate_likelihood(pred_fpath: Path, ref_data_name: str):
