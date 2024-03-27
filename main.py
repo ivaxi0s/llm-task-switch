@@ -75,7 +75,9 @@ if not core_args.force_rerun and model_output_file.is_file():
 else:
     print("Loading prompts")
     eval_idxs, prompts = pl.load_prompt_iterative(
-        num_examples=eval_args.num_examples, eval_size=eval_args.eval_size
+        num_examples=eval_args.num_examples,
+        eval_size=eval_args.eval_size,
+        seed_multiplier=core_args.seed,
     )
 
     pprint.pprint(prompts[0])

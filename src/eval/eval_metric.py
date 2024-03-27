@@ -56,10 +56,19 @@ def evaluate(
             return json.load(f)
 
     if ref_data_name is None:
-        m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.name)
-        if m is None:
+        f = pred_fpath.parent
+        for _ in range(6):
+            f = f.parent
+            m = RE_EVAL_DATA.match(f.name)
+            if m is not None:
+                ref_data_name = m.group(1)
+                break
+        else:
             raise ValueError(f"Could not extract eval data name from {pred_fpath}")
-        ref_data_name = m.group(1)
+        # m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.name)
+        # if m is None:
+        #     raise ValueError(f"Could not extract eval data name from {pred_fpath}")
+        # ref_data_name = m.group(1)
 
     # load predictions from cache
     with open(pred_fpath, "r") as f:
@@ -173,18 +182,25 @@ def extract_config_from_path(results_folder: str | Path, subdir="iterative"):
     experiments/
         <model>/eval_data_<eval_set>/incontext_data<incontext_data>
             num_examples_<#>/iterative/
+                                /seed_<#>/
     """
+    config = {}
     results_folder = Path(results_folder)
     if results_folder.is_file():
+        results_folder = results_folder.parent
+    if "seed" in results_folder.name:
+        config |= {"seed": int(results_folder.name.split("_")[-1])}
         results_folder = results_folder.parent
     if results_folder.name == subdir:
         results_folder = results_folder.parent
 
-    return {
+    config |= {
         "model": results_folder.parent.parent.parent.name,
         "incontext_set": RE_INCTXT.match(results_folder.parent.name).group(1),
         "num_examples": int(RE_NUM_EXAMPLES.match(results_folder.name).group(1)),
     }
+
+    return config
 
 
 def eval_rt(pred_data: list[str], ref_data: list[str]):

@@ -49,7 +49,9 @@ class PromptLoader:
         else:
             self.incontext_set = dataloader_dict[incontext]()
 
-    def load_prompt_iterative(self, num_examples: int, eval_size: int | None):
+    def load_prompt_iterative(
+        self, num_examples: int, eval_size: int | None, seed_multiplier: int = 1
+    ):
         """Return prompts from different datasets - iterative version of prompts: returns list of lists of dictionary
         first list iterates through samples in test dataset
         second list iterates through the user/assistant messages in turn
@@ -72,6 +74,8 @@ class PromptLoader:
             }
                 ]
         """
+        if seed_multiplier == 0:
+            raise ValueError("seed cannot be 0")
 
         # prompts = [
         #     (self.incontext_set.incontext_prompt(num_examples, seed=idx) + eval_prompt)
@@ -81,7 +85,9 @@ class PromptLoader:
         idxs_prompts = [
             (
                 idx,  # idx of the sample in the test dataset
-                self.incontext_set.incontext_prompt_iterative(num_examples, seed=idx)
+                self.incontext_set.incontext_prompt_iterative(
+                    num_examples, seed=idx * seed_multiplier
+                )
                 + [{"role": "user", "content": eval_prompt}],
             )
             for idx, eval_prompt in self.eval_set.eval_prompt(eval_size)

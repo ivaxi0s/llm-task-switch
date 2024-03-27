@@ -194,13 +194,13 @@ class MMLUAbstractAlgebraDataLoader(DataLoader):
         # Map the test set to evaluation prompts
         self.test = self.dataset["test"]
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._eval_prompt, load_from_cache_file=True
+            MMLUAbstractAlgebraDataLoader._eval_prompt, load_from_cache_file=False
         )
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=True
+            MMLUAbstractAlgebraDataLoader._target_text, load_from_cache_file=False
         )
         self.test = self.test.map(
-            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=True
+            MMLUAbstractAlgebraDataLoader._add_answer_tags, load_from_cache_file=False
         )
 
     @staticmethod
