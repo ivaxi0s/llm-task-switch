@@ -37,7 +37,7 @@ from src.data.promptloader import PromptLoader
 
 load_dotenv()
 # print(os.environ["HF_HOME"])
-
+print(os.environ["OPENAI_API_KEY"])
 
 # get command line arguments
 core_args = ModelArgs.argparse()
