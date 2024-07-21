@@ -4,6 +4,8 @@ iterative/results.json filter=lfs diff=lfs merge=lfs -text
 **/iterative/results.json filter=lfs diff=lfs merge=lfs -text
 **/iterative/predictions.json filter=lfs diff=lfs merge=lfs -text
 **/iterative/seed*/predictions.json filter=lfs diff=lfs merge=lfs -text
+**/iterative/seed*/eval_idxs.json filter=lfs diff=lfs merge=lfs -text
+**/iterative/seed*/results.json filter=lfs diff=lfs merge=lfs -text
 **/iterative/eval_idxs.json filter=lfs diff=lfs merge=lfs -text
 **/iterative/ll-eval_idxs.json filter=lfs diff=lfs merge=lfs -text
 **/converse/predictions.json filter=lfs diff=lfs merge=lfs -text
