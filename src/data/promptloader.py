@@ -49,38 +49,9 @@ class PromptLoader:
         else:
             self.incontext_set = dataloader_dict[incontext]()
 
-    def load_prompt(self, num_examples: int, eval_size: int | None):
-        """Return prompts from different datasets
-        prompt = incontext + eval
-
-        The prompts are pre-loaded into memory.
-        This is because not much RAM is required,
-        and the pre-processing is slow.
-
-        % TODO: add functionality to limit the test size(deterministically)
-
-        % TODO: if this is implemened as a dataset transform,
-        then this can be cached (tho this will only save around 40s)
-
-        Args:
-            incontext: name of the dataset to load incontext prompts from
-            eval: name of the dataset to load evaluation prompts from
-            num_examples: number of incontext examples to include
-        """
-
-        prompts = [
-            (
-                idx,
-                self.incontext_set.incontext_prompt(num_examples, seed=idx)
-                + eval_prompt,
-            )
-            for idx, eval_prompt in self.eval_set.eval_prompt(eval_size)
-        ]
-        eval_idxs, prompts = zip(*prompts)  # type: ignore
-
-        return eval_idxs, prompts
-
-    def load_prompt_iterative(self, num_examples: int, eval_size: int | None):
+    def load_prompt_iterative(
+        self, num_examples: int, eval_size: int | None, seed_multiplier: int = 1
+    ):
         """Return prompts from different datasets - iterative version of prompts: returns list of lists of dictionary
         first list iterates through samples in test dataset
         second list iterates through the user/assistant messages in turn
@@ -103,6 +74,8 @@ class PromptLoader:
             }
                 ]
         """
+        if seed_multiplier == 0:
+            raise ValueError("seed cannot be 0")
 
         # prompts = [
         #     (self.incontext_set.incontext_prompt(num_examples, seed=idx) + eval_prompt)
@@ -112,7 +85,9 @@ class PromptLoader:
         idxs_prompts = [
             (
                 idx,  # idx of the sample in the test dataset
-                self.incontext_set.incontext_prompt_iterative(num_examples, seed=idx)
+                self.incontext_set.incontext_prompt_iterative(
+                    num_examples, seed=idx * seed_multiplier
+                )
                 + [{"role": "user", "content": eval_prompt}],
             )
             for idx, eval_prompt in self.eval_set.eval_prompt(eval_size)

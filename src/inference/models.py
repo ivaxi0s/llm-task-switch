@@ -21,18 +21,7 @@ class OpenAIModel:
         self.model_name = model_name
         self.client = openai
 
-    def predict_batch(self, prompt_batch: list[dict]) -> list[str]:
-        """Predict a batch of prompts"""
-        msgs = [{"role": "user", "content": prompt} for prompt in prompt_batch]
-        responses = [
-            self.client.ChatCompletion.create(
-                model=OPENAI_MODELS[self.model_name], messages=[msg], temperature=0
-            )
-            for msg in msgs
-        ]
-        return [r.choices[0].message.content for r in responses]
-
-    def predict_batch_iteratively(self, prompt_batch: list[dict]) -> list[str]:
+    def predict_batch_iteratively(self, prompt_batch: list[list[dict]]) -> list[str]:
         """Predict a batch of prompts"""
         msgs_batches = []
         for prompts in prompt_batch:
@@ -64,27 +53,38 @@ class HFModel:
         self.max_new_tokens = 512  # Twice the 99.9th percentile of train set summaries
         print(f"Max new tokens: {self.max_new_tokens}")
 
-    def predict_batch(self, prompt_batch: list[str]) -> list[str]:
+    @torch.no_grad()
+    def predict_batch_converse(self, prompt_batch: list[dict]):
+        """Predict response for a conversation
+
+        prompt:
+
+        NOTE: batch_size must be 1
+
         """
 
-        # TODO: perhaps all the prompts here should be passed in
-        # Then the tokenizer can tokenize in one go?
+        if len(prompt_batch) > 1:
+            raise ValueError(f"Batch size {prompt_batch} must be 1")
 
-        # NOT TODO: batching in different order is too cumbersome
+        (prompts,) = prompt_batch
+        # msgs = [{"role": turn["role"], "content": turn["content"]} for turn in prompts]
 
-        padding: Adds 0s to ensure prompts are the same size
-        truncation: Pads upto the largest prompt in the batch
-        """
-        prompt_batch = [f"[INST]{prompt}[/INST]" for prompt in prompt_batch]
+        *history, target = prompts
 
-        inputs = self.tokenizer(
-            prompt_batch, padding=True, truncation=True, return_tensors="pt"
-        ).to(self.device)
-        # breakpoint()
+        history_responses = []
 
-        with torch.no_grad():
+        if len(history) > 0:
+            # Tokenize the history
+            encodeds = [
+                self.tokenizer.apply_chat_template([h], return_tensors="pt")
+                for h in history
+            ]
+
+        for h in history:
+            encodeds = self.tokenizer.apply_chat_template([h], return_tensors="pt")
+            inputs = encodeds.to(self.device)
             output = self.model.generate(
-                **inputs,
+                inputs,
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
                 max_new_tokens=self.max_new_tokens,
@@ -92,54 +92,27 @@ class HFModel:
                 top_p=1,
             )
 
-        # Remove the tokens that were in the prompt
-        output_tokens = output[:, inputs["input_ids"].shape[1] :]
-        # Check if max_new_tokens reached
-        if output_tokens.shape[1] == self.max_new_tokens:
-            num = sum(o != self.tokenizer.eos_token_id for o in output[:, -1])
-            print(f"WARNING: max_new_tokens reached; seqs truncated: {num}")
+        target_responses = []
 
-        # Batch decode tokens
-        batch_output_text = self.tokenizer.batch_decode(
-            output_tokens, skip_special_tokens=True
-        )  # NOTE batch decode strips the text by default
-        # breakpoint()
-        return batch_output_text
+        # 1. Generate the zero shot response for the task
+        encodeds = self.tokenizer.apply_chat_template([target], return_tensors="pt")
 
-    def predict(self, prompt):
-        # breakpoint()
-        inputs = self.tokenizer(f"[INST]{prompt}[/INST]", return_tensors="pt").to(
-            self.device
-        )
-        with torch.no_grad():
-            output = self.model.generate(
-                input_ids=inputs["input_ids"],
-                attention_mask=inputs["attention_mask"],
-                # top_k=top_k,
-                do_sample=False,
-                max_new_tokens=self.max_new_tokens,
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
-        output_tokens = output[0]
         breakpoint()
-        output_tokens = output_tokens[inputs["input_ids"].shape[1] :]
-        # breakpoint()
-        output_text = self.tokenizer.decode(
-            output_tokens, skip_special_tokens=True
-        ).strip()
-        return output_text
 
-    def predict_batch_iteratively(self, prompt_batch: list[dict]) -> list[str]:
+        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
+
+        breakpoint()
+
+    @torch.no_grad()
+    def predict_batch_iteratively(self, prompt_batch: list[list[dict]]) -> list[str]:
         """
         in context examples are passed iteratively
         assume prompt-batch is batch size x number_of_conversation_turns (role specified)
 
-        Unfortunately can only handle a batch size of 1
+        NOTE: can only handle a batch size of 1
         """
         if len(prompt_batch) > 1:
-            raise ValueError(
-                "Batch size cannot be bigger than one for iterative template"
-            )
+            raise ValueError(f"Batch size {prompt_batch} must be 1")
 
         prompts = prompt_batch[0]
         msgs = []
@@ -152,15 +125,14 @@ class HFModel:
 
         inputs = encodeds.to(self.device)
 
-        with torch.no_grad():
-            output = self.model.generate(
-                inputs,
-                do_sample=False,
-                pad_token_id=self.tokenizer.eos_token_id,
-                max_new_tokens=self.max_new_tokens,
-                temperature=0,
-                top_p=1,
-            )
+        output = self.model.generate(
+            inputs,
+            do_sample=False,
+            pad_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=self.max_new_tokens,
+            temperature=0,
+            top_p=1,
+        )
 
         # Batch decode tokens
         output_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)[
@@ -171,33 +143,6 @@ class HFModel:
         output_text = output_text.split("[/INST]")[-1]
         # breakpoint()
         return [output_text]
-
-    # @torch.no_grad()
-    # def predict_batch_auto_iterative(self, prompt_batch: list[list[dict]]) -> list[str]:
-    #     """Predict a batch of prompts
-
-    #     Assume
-    #         - prompt_batch is {user, system}
-    #         - the last turn is the user
-    #         - the system responses have been generated previously
-
-    #     """
-    #     # breakpoint()
-    #     if len(prompt_batch) > 1:
-    #         raise ValueError(
-    #             "Batch size cannot be bigger than one for iterative template"
-    #         )
-
-    #     prompts, _ = prompt_batch
-    #     msgs = [{"role": turn["role"], "content": turn["content"]} for turn in prompts]
-
-    #     if len(msgs) < 2:
-    #         raise ValueError(
-    #             "At least two user turns are required for auto iterative template"
-    #         )
-
-    #     # Split the prompts into history and target msgs
-    #     *history, target = msgs
 
     @torch.no_grad()
     def response_probabilities(self, history: list[dict], response: str):

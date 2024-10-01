@@ -1,7 +1,6 @@
 #!/bin/bash
 # This script runs the experiment
 # test set: mmluaa
-# incontext dataset:
 # model: llama-7b
 # NOTE: The test size is *not* limited
 
@@ -9,7 +8,6 @@ conda activate inctxt
 
 MODEL_NAME="llama-7b"
 
-# do not include dailmail, as we have to limit eval_Size
 INCONTEXT_SETS=("mmluaa" "tweetqa" "gigaword" "rotten_tomatoes")
 
 # For each incontext dataset

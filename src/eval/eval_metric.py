@@ -4,12 +4,39 @@ from pathlib import Path
 import evaluate as hf_evl  # type: ignore
 import numpy as np
 import pickle
+from typing import Callable
+from transformers import AutoTokenizer  # type: ignore
+
 
 # RE patterns for extracting config information from results folder path
 RE_INCTXT = re.compile(r"^incontext_data_(.*)")  # Extract in context set
 RE_NUM_EXAMPLES = re.compile(r"^num_examples_(.*)")  # Extract number of examples
 RE_EVAL_DATA = re.compile(r"^eval_data_(.*)")  # Extract eval data name
 RE_ANSWER_TAGS = re.compile(r"<Answer>(.*?)</Answer>")
+
+llama_tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf")
+mistral_tokenizer = AutoTokenizer.from_pretrained("mistralai/Mistral-7B-Instruct-v0.1")
+
+
+def get_dataset_eval_func(dataset: str) -> Callable:
+    dataset_eval = {
+        "rotten_tomatoes": eval_rt,
+        "gigaword": eval_gigaword,
+        "dailymail": eval_dailymail,
+        "tweetqa": eval_tweetqa,
+        "gsm8k": eval_gsm8k,
+        "mmluaa": eval_mmluaa,
+        "moral": eval_mmluaa,
+        "mmlu-math": eval_mmluaa,
+    }
+    if "mmlu" in dataset:
+        dataset_eval[dataset] = eval_mmluaa
+
+    # evaluate predictions
+    if not dataset in dataset_eval:
+        raise ValueError(f"Unknown dataset: {dataset}")
+
+    return dataset_eval[dataset]
 
 
 def evaluate(
@@ -34,42 +61,150 @@ def evaluate(
             return json.load(f)
 
     if ref_data_name is None:
-        m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.name)
+        f = pred_fpath.parent
+        for _ in range(6):
+            f = f.parent
+            m = RE_EVAL_DATA.match(f.name)
+            if m is not None:
+                ref_data_name = m.group(1)
+                break
+        else:
+            raise ValueError(f"Could not extract eval data name from {pred_fpath}")
+        # m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.name)
+        # if m is None:
+        #     raise ValueError(f"Could not extract eval data name from {pred_fpath}")
+        # ref_data_name = m.group(1)
+
+    # load predictions from cache
+    with open(pred_fpath, "r") as f:
+        pred_data = json.load(f)
+
+    # Evaluate predictions
+    results = get_dataset_eval_func(ref_data_name)(pred_data, ref_data)
+    # include config information in results
+    results |= extract_config_from_path(pred_fpath)
+    # Calculate baseline likelihood
+    results |= calculate_likelihood(pred_fpath, ref_data_name)
+
+    # Calculate token lengths
+    results |= calculate_token_size(pred_fpath, results["model"])
+
+    # Store results in json in same dir as pred_fpath
+    with open(results_file, "w") as f:
+        json.dump(results, f, indent=2)
+    return results
+
+
+def evaluate_converse(
+    pred_fpath: Path,
+    ref_data: list,
+    ref_data_name: str | None = None,
+    use_cached=False,
+) -> dict:
+    """Calculate results for predictions in the style of a conversation
+
+    pred_fpath:
+
+    Assuming predictions is in the format:
+        [
+            [zero shot responses],
+            [response after 1st turn],
+            ...
+        ]
+    """
+    # Check if results are already cached
+    results_file = Path(pred_fpath).parent / "results.json"
+    if use_cached and results_file.is_file():
+        # load results from cache
+        with open(results_file, "r") as f:
+            return json.load(f)
+
+    if ref_data_name is None:
+        m = RE_EVAL_DATA.match(pred_fpath.parent.parent.parent.parent.parent.name)
         if m is None:
             raise ValueError(f"Could not extract eval data name from {pred_fpath}")
         ref_data_name = m.group(1)
 
     # load predictions from cache
     with open(pred_fpath, "r") as f:
-        pred_data = json.load(f)
+        predictions = json.load(f)
 
-    dataset_eval = {
-        "rotten_tomatoes": eval_rt,
-        "gigaword": eval_gigaword,
-        "dailymail": eval_dailymail,
-        "tweetqa": eval_tweetqa,
-        "gsm8k": eval_gsm8k,
-        "mmluaa": eval_mmluaa,
-        "moral": eval_mmluaa,
-        "mmlu-math": eval_mmluaa,
-    }
-    if "mmlu" in ref_data_name:
-        dataset_eval[ref_data_name] = eval_mmluaa
-
-    # evaluate predictions
-    if not ref_data_name in dataset_eval:
-        raise ValueError(f"Unknown dataset: {ref_data_name}")
+    # include config information in results
+    # breakpoint()
+    results = extract_config_from_path(pred_fpath.parent.parent)
+    # Calculate baseline likelihood
+    for idx, p in enumerate(predictions):
+        assert len(p) == len(ref_data)
+        results |= {
+            f"history_length_{idx}": get_dataset_eval_func(ref_data_name)(p, ref_data)
+        }
 
     # Evaluate predictions
-    results = dataset_eval[ref_data_name](pred_data, ref_data)
-    # include config information in results
-    results |= extract_config_from_path(pred_fpath)
-    # Calculate baseline likelihood
-    results |= calculate_likelihood(pred_fpath, ref_data_name)
+    # results = get_dataset_eval_func(ref_data_name)(predictions, ref_data)
+    # results |= calculate_likelihood(pred_fpath, ref_data_name)
     # Store results in json in same dir as pred_fpath
     with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
     return results
+
+
+def calculate_token_size(pred_fpath: Path, model: str):
+    """Return the mean token size of prompts, predictions and full conversation
+
+    Args:
+        pred_fpath: ...dir/predictions.json
+    """
+    tokens = {}
+    if model == "llama-7b":
+        tokenizer = llama_tokenizer
+    elif model == "mistral-7b":
+        tokenizer = mistral_tokenizer
+    else:
+        return tokens
+
+    # load predictions
+    with open(pred_fpath, "r") as f:
+        pred_data = json.load(f)
+        pred_tokens_length = tokenizer(
+            pred_data,
+            return_attention_mask=False,
+            return_length=True,
+        )["length"]
+        pred_tokens_length = np.mean(pred_tokens_length)
+
+    # load prompts
+    prompt_fpath = pred_fpath.parent / "prompts.json"
+    with open(prompt_fpath, "r") as f:
+        prompt_data = json.load(f)
+        # check if conversation history length is 0
+        if len(prompt_data[0]) == 1:
+            conversation_history_length = 0
+        else:
+            conversation_history_length = [
+                len(tokenizer.apply_chat_template(prompt[:-1]))
+                for prompt in prompt_data
+            ]
+            conversation_history_length = np.mean(conversation_history_length)
+        # prompt_tokens_length = [
+        #     len(tokenizer.apply_chat_template(prompt)) for prompt in prompt_data
+        # ]
+        # prompt_tokens_length = np.mean(prompt_tokens_length)
+        target_task_length = [
+            len(tokenizer.apply_chat_template(prompt[-1:])) for prompt in prompt_data
+        ]
+        target_task_length = np.mean(target_task_length)
+
+    tokens |= {
+        # "mean_prompt_tokens_length": prompt_tokens_length,
+        "mean_conversation_history_length": conversation_history_length,
+        "mean_target_task_length": target_task_length,
+        "mean_pred_tokens_length": pred_tokens_length,
+        "mean_conversation_length": conversation_history_length
+        + target_task_length
+        + pred_tokens_length,
+    }
+
+    return tokens
 
 
 def calculate_likelihood(pred_fpath: Path, ref_data_name: str):
@@ -115,18 +250,25 @@ def extract_config_from_path(results_folder: str | Path, subdir="iterative"):
     experiments/
         <model>/eval_data_<eval_set>/incontext_data<incontext_data>
             num_examples_<#>/iterative/
+                                /seed_<#>/
     """
+    config = {}
     results_folder = Path(results_folder)
     if results_folder.is_file():
+        results_folder = results_folder.parent
+    if "seed" in results_folder.name:
+        config |= {"seed": int(results_folder.name.split("_")[-1])}
         results_folder = results_folder.parent
     if results_folder.name == subdir:
         results_folder = results_folder.parent
 
-    return {
+    config |= {
         "model": results_folder.parent.parent.parent.name,
         "incontext_set": RE_INCTXT.match(results_folder.parent.name).group(1),
         "num_examples": int(RE_NUM_EXAMPLES.match(results_folder.name).group(1)),
     }
+
+    return config
 
 
 def eval_rt(pred_data: list[str], ref_data: list[str]):

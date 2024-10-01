@@ -1,7 +1,6 @@
 #!/bin/bash
 # This script runs the experiment
-# test set: mmluaa
-# incontext dataset:
+# test set: mmlu Human Ageing
 # model: llama-7b
 # NOTE: The test size is *not* limited
 
@@ -9,7 +8,6 @@ conda activate inctxt
 
 MODEL_NAME="llama-7b"
 
-# do not include dailmail, as we have to limit eval_Size
 INCONTEXT_SETS=("mmlu-age" "rotten_tomatoes" "tweetqa" "gigaword")
 
 # For each incontext dataset
@@ -25,7 +23,6 @@ for INCONTEXT_SET in "${INCONTEXT_SETS[@]}"; do
       --batchsize 1 \
       --iterative \
       --gpu_id 3
-    # --likelihoods \
     # --no_predict \
     # --force_rerun \
   done

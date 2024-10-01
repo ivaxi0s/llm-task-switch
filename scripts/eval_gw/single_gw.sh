@@ -23,6 +23,4 @@ python ../main.py \
   --batchsize 1 \
   --iterative \
   $@
-# --model_name $MODEL_NAME \
-# --num_examples $NUM_EXAMPLES \
 # --gpu_id 2
