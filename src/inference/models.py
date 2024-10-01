@@ -1,7 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM  # type: ignore
 import torch
 import openai
-from src.tools.tools import get_default_device
+from src.tools.tools import get_default_device, DTYPE
 
 HF_MODEL_URLS = {
     "mistral-7b": "mistralai/Mistral-7B-Instruct-v0.1",
@@ -47,7 +47,7 @@ class HFModel:
         # print(self.tokenizer.padding_side)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model = AutoModelForCausalLM.from_pretrained(HF_MODEL_URLS[model_name])
-        self.model.to(device)
+        self.model.to(device, dtype=DTYPE)
         self.device = device
 
         self.max_new_tokens = 512  # Twice the 99.9th percentile of train set summaries
@@ -121,7 +121,6 @@ class HFModel:
 
         encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
         # return [encodeds.shape[-1]] # Debug token length
-        # breakpoint()
 
         inputs = encodeds.to(self.device)
 
@@ -178,7 +177,7 @@ class HFModel:
             logits = self.model.forward(input_ids=inputs)["logits"]
             probs = torch.softmax(logits[0, -1, :].cpu(), dim=-1)
             # Find the probability of the current response token
-            response_probabilities.append(probs[response_tokens[0, idx]].numpy())
+            response_probabilities.append(probs[response_tokens[0, idx]].float().numpy())
         return response_probabilities
 
 

@@ -18,7 +18,7 @@ class DataLoader:
     @property
     def dataset(self) -> DatasetDict:
         if self._dataset is None:
-            self._dataset = load_dataset(self.dataset_path, self.dataset_name)
+            self._dataset = load_dataset(self.dataset_path, self.dataset_name, trust_remote_code=True)
 
         return self._dataset
 

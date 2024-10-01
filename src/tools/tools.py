@@ -2,6 +2,7 @@ import torch
 import random
 import numpy as np
 
+DTYPE = torch.bfloat16
 
 def set_seeds(seed):
     torch.manual_seed(seed)
