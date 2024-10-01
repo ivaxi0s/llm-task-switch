@@ -16,4 +16,5 @@ dependencies = [
   "rouge_score",
   "joblib",
   "seaborn",
+  "openai",
 ]
