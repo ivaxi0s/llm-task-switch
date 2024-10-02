@@ -4,6 +4,7 @@ from datasets import load_dataset, DatasetDict  # type: ignore
 from transformers import AutoTokenizer  # type: ignore
 from abc import abstractmethod
 from typing import Generator
+import numpy as np
 
 
 @dataclass
@@ -18,7 +19,9 @@ class DataLoader:
     @property
     def dataset(self) -> DatasetDict:
         if self._dataset is None:
-            self._dataset = load_dataset(self.dataset_path, self.dataset_name, trust_remote_code=True)
+            self._dataset = load_dataset(
+                self.dataset_path, self.dataset_name, trust_remote_code=True
+            )
 
         return self._dataset
 
@@ -43,8 +46,7 @@ class DataLoader:
         return ds
 
     @abstractmethod
-    def load_test_reference(self):
-        ...
+    def load_test_reference(self): ...
 
     def load_likelihood_reference(self):
         """Return the reference data for likelihoods calculation"""
