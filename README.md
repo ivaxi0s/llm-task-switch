@@ -176,6 +176,8 @@ The datasets that can be used are shown in the table below, alongside their sour
 
 Dailymail examples have a large number of tokens, which is a problem when evaluating with `llama-7b` as it has a max token length of `4096`. In `./src/data/dataloader.py::DataLoader::remove_large_dataset_examples()`, we limit the size of each `user-system` conversation in the conversation history to be less than `1792`, allowing for a conversation history length $L=2$ with some remaining tokens for the target task.
 
+We noticed that our results were not consistent with time, because the models were updating fairly frequently. Be warned that our results may not match up with the current state of the models.
+
 ## Reference
 
 If you use Task-Switch, or scripts provided in this repository (eg., evaluation scripts) in your work, please cite the following paper:
