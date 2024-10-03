@@ -1,0 +1,40 @@
+{
+  "model": "llama-7b",
+  "incontext_set": "mmluaa",
+  "num_examples": 6,
+  "history_length_0": {
+    "matches": 35,
+    "failed": 0,
+    "total": 100
+  },
+  "history_length_1": {
+    "matches": 26,
+    "failed": 3,
+    "total": 100
+  },
+  "history_length_2": {
+    "matches": 28,
+    "failed": 2,
+    "total": 100
+  },
+  "history_length_3": {
+    "matches": 24,
+    "failed": 2,
+    "total": 100
+  },
+  "history_length_4": {
+    "matches": 24,
+    "failed": 4,
+    "total": 100
+  },
+  "history_length_5": {
+    "matches": 24,
+    "failed": 5,
+    "total": 100
+  },
+  "history_length_6": {
+    "matches": 26,
+    "failed": 5,
+    "total": 100
+  }
+}
