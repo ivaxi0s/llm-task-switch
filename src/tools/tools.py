@@ -17,3 +17,4 @@ def get_default_device(gpu_id=0):
     else:
         print("No CUDA found")
         return torch.device("cpu")
+
