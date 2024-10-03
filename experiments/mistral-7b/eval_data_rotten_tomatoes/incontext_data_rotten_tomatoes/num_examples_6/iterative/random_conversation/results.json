@@ -1,0 +1,40 @@
+{
+  "model": "mistral-7b",
+  "incontext_set": "rotten_tomatoes",
+  "num_examples": 6,
+  "history_length_0": {
+    "matches": 922,
+    "failed": 1,
+    "total": 1066
+  },
+  "history_length_1": {
+    "matches": 912,
+    "failed": 0,
+    "total": 1066
+  },
+  "history_length_2": {
+    "matches": 911,
+    "failed": 0,
+    "total": 1066
+  },
+  "history_length_3": {
+    "matches": 912,
+    "failed": 0,
+    "total": 1066
+  },
+  "history_length_4": {
+    "matches": 912,
+    "failed": 0,
+    "total": 1066
+  },
+  "history_length_5": {
+    "matches": 910,
+    "failed": 0,
+    "total": 1066
+  },
+  "history_length_6": {
+    "matches": 911,
+    "failed": 0,
+    "total": 1066
+  }
+}

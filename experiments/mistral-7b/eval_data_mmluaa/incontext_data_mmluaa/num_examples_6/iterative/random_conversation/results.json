@@ -1,0 +1,40 @@
+{
+  "model": "mistral-7b",
+  "incontext_set": "mmluaa",
+  "num_examples": 6,
+  "history_length_0": {
+    "matches": 22,
+    "failed": 0,
+    "total": 100
+  },
+  "history_length_1": {
+    "matches": 23,
+    "failed": 0,
+    "total": 100
+  },
+  "history_length_2": {
+    "matches": 23,
+    "failed": 1,
+    "total": 100
+  },
+  "history_length_3": {
+    "matches": 23,
+    "failed": 1,
+    "total": 100
+  },
+  "history_length_4": {
+    "matches": 25,
+    "failed": 2,
+    "total": 100
+  },
+  "history_length_5": {
+    "matches": 23,
+    "failed": 1,
+    "total": 100
+  },
+  "history_length_6": {
+    "matches": 22,
+    "failed": 1,
+    "total": 100
+  }
+}
