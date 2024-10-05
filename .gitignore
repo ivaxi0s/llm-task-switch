@@ -28,6 +28,9 @@ hpc/
 cache/
 scripts/*.sh
 scripts/**/*.sh
+.venv/
+build/
 
 *.egg-info/
 .ipynb_checkpoints/
+__pycache__/

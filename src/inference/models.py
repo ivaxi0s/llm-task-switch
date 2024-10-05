@@ -1,7 +1,8 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM  # type: ignore
+from transformers import AutoTokenizer, AutoModelForCausalLM, set_seed  # type: ignore
 import torch
 import openai
-from src.tools.tools import get_default_device
+from src.tools.tools import get_default_device, DTYPE
+from tqdm import tqdm
 
 HF_MODEL_URLS = {
     "mistral-7b": "mistralai/Mistral-7B-Instruct-v0.1",
@@ -23,6 +24,7 @@ class OpenAIModel:
 
     def predict_batch_iteratively(self, prompt_batch: list[list[dict]]) -> list[str]:
         """Predict a batch of prompts"""
+
         msgs_batches = []
         for prompts in prompt_batch:
             msgs = []
@@ -47,61 +49,61 @@ class HFModel:
         # print(self.tokenizer.padding_side)
         self.tokenizer.pad_token = self.tokenizer.eos_token
         self.model = AutoModelForCausalLM.from_pretrained(HF_MODEL_URLS[model_name])
-        self.model.to(device)
+        self.model.to(device, dtype=DTYPE)
         self.device = device
 
         self.max_new_tokens = 512  # Twice the 99.9th percentile of train set summaries
         print(f"Max new tokens: {self.max_new_tokens}")
 
+        self.generation_kwargs = dict(
+            do_sample=False,
+            pad_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=self.max_new_tokens,
+            temperature=0,
+            top_p=1,
+        )
+
     @torch.no_grad()
-    def predict_batch_converse(self, prompt_batch: list[dict]):
-        """Predict response for a conversation
+    def generate_random_history(self, seed, number=20, max_new_tokens=150) -> list[dict]:
+        """Generate a random history: [{user: ..., assistant: ...}, ...]"""
 
-        prompt:
+        prompts = []
 
-        NOTE: batch_size must be 1
-
-        """
-
-        if len(prompt_batch) > 1:
-            raise ValueError(f"Batch size {prompt_batch} must be 1")
-
-        (prompts,) = prompt_batch
-        # msgs = [{"role": turn["role"], "content": turn["content"]} for turn in prompts]
-
-        *history, target = prompts
-
-        history_responses = []
-
-        if len(history) > 0:
-            # Tokenize the history
-            encodeds = [
-                self.tokenizer.apply_chat_template([h], return_tensors="pt")
-                for h in history
+        set_seed(seed)
+        for _ in tqdm(range(number)):
+            # 1. Generate a random user message
+            output = self.model.generate(
+                self.tokenizer("", return_tensors="pt").input_ids.to(self.device),
+                do_sample=True,
+                temperature=1.0,
+                max_new_tokens=max_new_tokens,
+                pad_token_id=self.tokenizer.eos_token_id,
+            )
+            output_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)[
+                0
             ]
 
-        for h in history:
-            encodeds = self.tokenizer.apply_chat_template([h], return_tensors="pt")
+            # 2. Generate assistant response
+            msg = {"role": "user", "content": output_text}
+            encodeds = self.tokenizer.apply_chat_template([msg], return_tensors="pt")
             inputs = encodeds.to(self.device)
             output = self.model.generate(
                 inputs,
-                do_sample=False,
-                pad_token_id=self.tokenizer.eos_token_id,
-                max_new_tokens=self.max_new_tokens,
-                temperature=0,
-                top_p=1,
+                **self.generation_kwargs | {"max_new_tokens": max_new_tokens},
+            )
+            system_text = self.tokenizer.batch_decode(output, skip_special_tokens=True)[
+                0
+            ]
+            system_text = system_text.split("[/INST]")[-1].strip()
+
+            prompts.append(
+                [
+                    {"role": "user", "content": output_text},
+                    {"role": "assistant", "content": system_text},
+                ]
             )
 
-        target_responses = []
-
-        # 1. Generate the zero shot response for the task
-        encodeds = self.tokenizer.apply_chat_template([target], return_tensors="pt")
-
-        breakpoint()
-
-        encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
-
-        breakpoint()
+        return prompts
 
     @torch.no_grad()
     def predict_batch_iteratively(self, prompt_batch: list[list[dict]]) -> list[str]:
@@ -121,7 +123,6 @@ class HFModel:
 
         encodeds = self.tokenizer.apply_chat_template(msgs, return_tensors="pt")
         # return [encodeds.shape[-1]] # Debug token length
-        # breakpoint()
 
         inputs = encodeds.to(self.device)
 
@@ -178,7 +179,9 @@ class HFModel:
             logits = self.model.forward(input_ids=inputs)["logits"]
             probs = torch.softmax(logits[0, -1, :].cpu(), dim=-1)
             # Find the probability of the current response token
-            response_probabilities.append(probs[response_tokens[0, idx]].numpy())
+            response_probabilities.append(
+                probs[response_tokens[0, idx]].float().numpy()
+            )
         return response_probabilities
 
 

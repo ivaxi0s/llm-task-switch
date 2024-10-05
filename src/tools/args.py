@@ -56,10 +56,11 @@ class EvalArgs:
     eval_data_name: str  # Evaluation dataset
     num_examples: int
     no_predict: bool
-    eval_size: int | None  # Number of examples to evaluate on (if > test set size, use test set size)
+    eval_size: (
+        int | None
+    )  # Number of examples to evaluate on (if > test set size, use test set size)
     iterative: bool
     likelihoods: bool
-
 
     @staticmethod
     def argparse() -> "EvalArgs":

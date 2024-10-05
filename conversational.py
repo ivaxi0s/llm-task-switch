@@ -77,7 +77,7 @@ if not core_args.batchsize == 1:
 
 set_seeds(core_args.seed)
 base_path = base_path_creator(MAIN_PATH, core_args, eval_args, converse=True)
-print("Output path: ", base_path)
+print("--> Output path: ", base_path)
 
 # Load dataset
 print("Loading prompt loader")

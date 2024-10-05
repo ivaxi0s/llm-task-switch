@@ -16,9 +16,9 @@ Typically, when an LLM responds to a user prompt, the model conditions itself ba
 
 We use the example above to define some terms used throughout the repository:
 
-- A _turn_ consists of a _user prompt_ $u$, and a _system response_ $r$. 
-  - In the example above, the **Top** box shows 3 turn, while the **Bottom** box has _1_ turn. 
-- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{(u_k, r_k)\}_{k = 1}^{L}$, where $L$ is the length of the conversation history. 
+- A _turn_ consists of a _user prompt_ $u$, and a _system response_ $r$.
+  - In the example above, the **Top** box shows 3 turn, while the **Bottom** box has _1_ turn.
+- A _conversation history_ (CH) consists of multiple _turns_: $\boldsymbol{h} = \{(u_k, r_k)\}_{k = 1}^{L}$, where $L$ is the length of the conversation history.
   - In the example above, the **Top** box has a conversation history length $L = 2$, where as the bottom box has no conversation history $L = 0$. This is equivalent to a _"zero-shot"_ setting.
 - _`incontext_data`_ : This is the dataset used to provide teacher-forced examples to form a _conversation history_.
   - In the example above, this dataset is the one for "Sentiment Prediction" (e.g. [rotten tomatoes](https://huggingface.co/datasets/rotten_tomatoes))
@@ -27,7 +27,7 @@ We use the example above to define some terms used throughout the repository:
 
 ## Results
 
-After running experiments (or using our results), you can reproduce the plots shown in this markdown file (or the paper) using the notebook provided in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb). 
+After running experiments (or using our results), you can reproduce the plots shown in this markdown file (or the paper) using the notebook provided in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb).
 
 ### Performance change due to Task-Switch
 
@@ -65,11 +65,15 @@ We calculate the sensitivity in peformance relative to zero-shot using the funct
 
 ## Code Setup
 
-Install the relevant conda dependencies from `environment.yaml` and python packages using `pyproject.toml`. 
+Install the relevant conda dependencies from `environment.yaml` and python packages using `pyproject.toml`.
+
 - `conda env create -f environment.yaml`
 - `pip install .`
 
-There are two entry points for the code: [`main.py`](main.py) and [`likelihoods.py`](likelihoods.py). 
+Note: you may need to login to huggingface to use the models. Use `huggingface-cli login` to login.
+
+There are two entry points for the code: [`main.py`](main.py) and [`likelihoods.py`](likelihoods.py).
+
 - All args that can be specified can be found in [src/tools/args.py](src/tools/args.py)
   - Args are also documented below and in the entry point files
 - Models can be found in [src/inference/models.py](src/inference/models.py) (See [models section](###models) for more details)
@@ -78,8 +82,8 @@ There are two entry points for the code: [`main.py`](main.py) and [`likelihoods.
 
 ### Saving results
 
-For ease of reproducability, we provide our results in `experiments/`. These are tracked usin [`git-lfs`](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-git-lfs-objects-in-archives-of-your-repository).
-It would be beneficial to move this to a separate folder before running your own experiments. 
+For ease of reproducability, we provide our results in `experiments/`. These are tracked using [`git-lfs`](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-git-lfs-objects-in-archives-of-your-repository).
+It would be beneficial to move this to a separate folder before running your own experiments.
 
 When running your experiments, results are saved in `./experiments/<model>/eval_data_<dataset>/incontext_data_<dataset>/num_examples_<int>/iterative/`. See [src/tools/saving.py](src/tools/saving.py) for further details.
 
@@ -106,7 +110,6 @@ Optionally, the following args can be specified
 - `--force_rerun` forces re-running the experiment, otherwise the results will be loaded from the `./experiments` folder
 - `--no_predict` this will skip loading / running the model for evaluating performance. This is useful to debug prompts
 
-
 ### Evaluating the task-switch sensitivity (`likelihoods.py`)
 
 To evaluate the sensitivity of a model on task-switch, use the command:
@@ -121,16 +124,16 @@ python likelihoods.py \
   --likelihoods
 ```
 
-NOTE: this will only work for models for which we have access to their logits (i.e. `llama-7b` and `mistral-7b`). 
+NOTE: this will only work for models for which we have access to their logits (i.e. `llama-7b` and `mistral-7b`).
 
-We recommend running with `--num_examples 0` for the zero-shot likelihoods, and then running it for more examples (e.g. `3`, `6`.) This is because the sensitivity metrics are calculate relative to a baseline of `--num_examples 0`. 
+We recommend running with `--num_examples 0` for the zero-shot likelihoods, and then running it for more examples (e.g. `3`, `6`.) This is because the sensitivity metrics are calculate relative to a baseline of `--num_examples 0`.
 
 Optionally, the following args can be specified:
 
 - `--eval_size <int|blank>` set the number of examples to use when calculating the likelihoods (typically 10-100). NOTE: when running experiments for a specific combination of `model-eval_data-incontext_data`, the `--eval_size` **must** be kept the same, otherwise you will not be able to compare results between a different number of `num_examples`.
 
 ### Models
- 
+
 We support instruction tuned models from Hugging Face and Open AI. The `<model>` and their details are shown  in the table below:
 
 | `<model>`      | Details                                | Type         |
@@ -139,7 +142,6 @@ We support instruction tuned models from Hugging Face and Open AI. The `<model>`
 | `"llama-7b"`   | `"meta-llama/Llama-2-7b-chat-hf"`      | Hugging Face |
 | `"gpt3.5"`     | `"gpt-3.5-turbo"`                      | Open AI      |
 | `"gpt4"`       | `"gpt-4"`                              | Open AI      |
-
 
 To run GPT3.5 / GPT4, an openAI API key is required. Specify this in a `.env` file such as:
 
@@ -151,7 +153,8 @@ OPENAI_API_KEY=mykey
 ### Datasets
 
 When running the scripts, datasets can be specified in the args:
-- `--incontext_data_name <dataset>`: the dataset used for teacher-forced examples. In task-switching, this is the _"conversation history"_. 
+
+- `--incontext_data_name <dataset>`: the dataset used for teacher-forced examples. In task-switching, this is the _"conversation history"_.
 - `--eval_data_name <dataset>`: the dataset to evaluate on. In task-switching, this is the _"target task"_.
 
 The datasets that can be used are shown in the table below, alongside their source:
@@ -169,11 +172,11 @@ The datasets that can be used are shown in the table below, alongside their sour
 | `"mmlu-math"`       | [Hugging Face](https://huggingface.co/datasets/lukaemon/mmlu/viewer/high_school_mathematics) |
 | `"mmlu-law"`        | [Hugging Face](https://huggingface.co/datasets/lukaemon/mmlu/viewer/professional_law)        |
 
-
 #### Warning
 
-Dailymail examples have a large number of tokens, which is a problem when evaluating with `llama-7b` as it has a max token length of `4096`. In `./src/data/dataloader.py::DataLoader::remove_large_dataset_examples()`, we limit the size of each `user-system` conversation in the conversation history to be less than `1792`, allowing for a conversation history length $L=2$ with some remaining tokens for the target task. 
+Dailymail examples have a large number of tokens, which is a problem when evaluating with `llama-7b` as it has a max token length of `4096`. In `./src/data/dataloader.py::DataLoader::remove_large_dataset_examples()`, we limit the size of each `user-system` conversation in the conversation history to be less than `1792`, allowing for a conversation history length $L=2$ with some remaining tokens for the target task.
 
+We noticed that our results were not consistent with time, because the models were updating fairly frequently. Be warned that our results may not match up with the current state of the models.
 
 ## Reference
 
@@ -190,4 +193,4 @@ If you use Task-Switch, or scripts provided in this repository (eg., evaluation 
 }
 ```
 
-**Arxiv pre-print**: https://arxiv.org/abs/2402.18216
+**Arxiv pre-print**: <https://arxiv.org/abs/2402.18216>

@@ -2,6 +2,7 @@ import torch
 import random
 import numpy as np
 
+DTYPE = torch.bfloat16
 
 def set_seeds(seed):
     torch.manual_seed(seed)
@@ -16,3 +17,4 @@ def get_default_device(gpu_id=0):
     else:
         print("No CUDA found")
         return torch.device("cpu")
+
