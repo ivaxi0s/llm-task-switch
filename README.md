@@ -1,6 +1,10 @@
-# LLM Task-Switch
-
+# [EMNLP 2024] LLM Task-Switch
 _Evaluating LLM performance and sensitivity when there is a "task-switch"_
+
+Codebase of the paper - ["LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History"](https://arxiv.org/abs/2402.18216)
+
+[Akash Gupta](https://scholar.google.com/citations?user=6Ngx1n8AAAAJ&hl=en), [Ivaxi Sheth](https://ivaxi0s.github.io/), [Vyas Raina](https://scholar.google.com/citations?hl=en&user=BxFBCoYAAAAJ&view_op=list_works), [Mark Gales](https://mi.eng.cam.ac.uk/~mjfg/), [Mario Fritz](https://cispa.saarland/group/fritz/)
+
 
 **Motivation**
 
