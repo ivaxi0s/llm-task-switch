@@ -3,14 +3,16 @@ _Evaluating LLM performance and sensitivity when there is a "task-switch"_
 
 Codebase of the paper - ["LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History"](https://arxiv.org/abs/2402.18216)
 
-[Akash Gupta](https://scholar.google.com/citations?user=6Ngx1n8AAAAJ&hl=en), [Ivaxi Sheth](https://ivaxi0s.github.io/), [Vyas Raina](https://scholar.google.com/citations?hl=en&user=BxFBCoYAAAAJ&view_op=list_works), [Mark Gales](https://mi.eng.cam.ac.uk/~mjfg/), [Mario Fritz](https://cispa.saarland/group/fritz/)
+[Akash Gupta](https://github.com/Guppy16), [Ivaxi Sheth](https://ivaxi0s.github.io/), [Vyas Raina](https://scholar.google.com/citations?hl=en&user=BxFBCoYAAAAJ&view_op=list_works), [Mark Gales](https://mi.eng.cam.ac.uk/~mjfg/), [Mario Fritz](https://cispa.saarland/group/fritz/)
 
 
 **Motivation**
 
 Typically, when an LLM responds to a user prompt, the model conditions itself based on the prior conversation history to provide some basic short-term memory. Generally, this sensitivity to the history is efficacious, but can be counteractive when there is a "task-switch". In this repo, we evaluate the performance of models when switching tasks.
 
+<p align="center">
 <img src="task-switch-2.png" alt="Task-Switch" width="300">
+</p>
 
 > Figure 1: An illustrative example of _task-switch_. \
 > **Top** box: The chat history is based on sentiment prediction. Algebra word problem introduces a _task-switch_, which results in an incorrect prediction. \
@@ -31,41 +33,31 @@ We use the example above to define some terms used throughout the repository:
 
 ## Results
 
-After running experiments (or using our results), you can reproduce the plots shown in this markdown file (or the paper) using the notebook provided in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb).
+After running experiments (or using our results), you can reproduce the plots shown in this markdown file (or the paper) using the notebook provided in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb). For multiple seeds, you may use the notebook: [`results/plot_seeds.ipynb`](./results/plot_seeds.ipynb).
 
 ### Performance change due to Task-Switch
 
 We calculate the percentage change in peformance relative to zero-shot using the function `df_metric_pct_change()`:
 
-<img src="results/mmluaa/accuracy.png" alt="MMLU Abstract Algebra Task-Switch" width="900">
+<p align="center">
+<img src="results/mmluaa/seeds_accuracy.png" alt="MMLU Abstract Algebra Task-Switch" width="900">
+</p>
 
 > Figure 2: Target Task: MMLU Abstract Algebra (multiple choice questions). Percentage change in accuracy relative to zero-shot (higher means better performance). \
-> As expected, when the conversation history task is MMLU Abstract Algebra, the model performs well. \
-> However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to a task-switch.
+> As expected, when the conversation history task is MMLU Abstract Algebra, most models perform well. \
+> However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to that task-switch.
 
 ### Sensitivity due to Task-Switch
 
-We calculate the sensitivity in peformance relative to zero-shot using the function `expectation_metrics()`:
+We calculate the sensitivity in peformance relative to zero-shot using the function `expectation_metrics()` (in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb)):
 
+<p align="center">
 <img src="results/mmluaa/sensitivity.png" alt="Sensitivity on Task-Switch to MMLU Abstract Algebra" width="900">
+</p>
 
 > Figure 11a: Sensitivity of models for the Target Task: Rotten Tomatoes (sentiment classification) \
-> As expected, , when the conversation history task remains as rotten tomatoes, all models performs well. \
+> As expected, when the conversation history task remains as rotten tomatoes, all models perform well. \
 > However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to this task-switch.
-
-<!-- <img src="results/rt/accuracy.png" alt="Performance on Task-Switch to Rotten Tomatoes" width="900">
-
-> Figure 2: Target Task: Rotten Tomatoes (sentiment classification). Percentage change in accuracy relative to zero-shot (higher means better performance). \
-> As expected, when the conversation history task remains as rotten tomatoes, all models performs well. \
-> However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to this task-switch.
-
-### Sensitivity due to Task-Switch
-
-<img src="results/rt/exp_base.png" alt="Sensitivity on Task-Switch to Rotten Tomatoes" width="900">
-
-> Figure 11a: Sensitivity of models for the Target Task: Rotten Tomatoes (sentiment classification) \
-> As expected, , when the conversation history task remains as rotten tomatoes, all models performs well. \
-> However, when the conversation history task is different, _some_ models perform worse than zero-shot, suggesting that the model is sensitive to this task-switch. -->
 
 ## Code Setup
 
@@ -76,13 +68,20 @@ Install the relevant conda dependencies from `environment.yaml` and python packa
 
 Note: you may need to login to huggingface to use the models. Use `huggingface-cli login` to login.
 
-There are two entry points for the code: [`main.py`](main.py) and [`likelihoods.py`](likelihoods.py).
+There are a few entry points depending on the type of experiment you would like to run.
+
+To measure the model *performance* on task-switches, use the following scripts:
+* [`main.py`](main.py): conversations with teacher-forced responses for the history task - this represents the outcome of a theoretically "perfect" model
+* [`conversational.py`](conversational.py): conversations where the model generates its own answers to the history task (i.e with*out* teacher-forcing) 
+* [`random_conversation.py`](random_conversation.py): conversations where the history task is randomly generated by the model itself
+
+To measure the model *sensitivity* to task-switches, use [`likelihoods.py`](likelihoods.py).
 
 - All args that can be specified can be found in [src/tools/args.py](src/tools/args.py)
   - Args are also documented below and in the entry point files
 - Models can be found in [src/inference/models.py](src/inference/models.py) (See [models section](###models) for more details)
 - Datasets can be found in [src/data/dataloader.py](src/data/dataloader.py) (See [datasets section](###datasets) for more details)
-- Results are plot using the notebook in [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb)
+- Results are plot using the notebooks in [`results/`](./results/) such as [`results/plot_metrics.ipynb`](./results/plot_metrics.ipynb`)
 
 ### Saving results
 
@@ -90,6 +89,7 @@ For ease of reproducability, we provide our results in `experiments/`. These are
 It would be beneficial to move this to a separate folder before running your own experiments.
 
 When running your experiments, results are saved in `./experiments/<model>/eval_data_<dataset>/incontext_data_<dataset>/num_examples_<int>/iterative/`. See [src/tools/saving.py](src/tools/saving.py) for further details.
+(For `likelihoods.py` and `random_conversation.py`, we don't split the results by `num_examples_<int>` - you may request an issue if you would like clarity.)
 
 ### Evaluating task-switch performance (`main.py`)
 
@@ -151,7 +151,7 @@ To run GPT3.5 / GPT4, an openAI API key is required. Specify this in a `.env` fi
 
 ```.env
 # .env
-OPENAI_API_KEY=mykey
+OPENAI_API_KEY="mykey"
 ```
 
 ### Datasets
@@ -187,13 +187,11 @@ We noticed that our results were not consistent with time, because the models we
 If you use Task-Switch, or scripts provided in this repository (eg., evaluation scripts) in your work, please cite the following paper:
 
 ```bibtex
-@misc{taskswitch2024,
-      title={LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History}, 
-      author={Akash Gupta and Ivaxi Sheth and Vyas Raina and Mark Gales and Mario Fritz},
-      year={2024},
-      eprint={2402.18216},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL}
+@article{taskswitch2024,
+  title={LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History},
+  author={Gupta, Akash and Sheth, Ivaxi and Raina, Vyas and Gales, Mark and Fritz, Mario},
+  journal={arXiv preprint arXiv:2402.18216},
+  year={2024}
 }
 ```
 
