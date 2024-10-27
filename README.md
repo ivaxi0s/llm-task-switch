@@ -1,9 +1,11 @@
 # [EMNLP 2024] LLM Task-Switch
 _Evaluating LLM performance and sensitivity when there is a "task-switch"_
 
-Codebase of the paper - ["LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History"](https://arxiv.org/abs/2402.18216)
+[![arxiv](https://img.shields.io/badge/arXiv-2402.18216-b31b1b.svg)](https://arxiv.org/abs/2402.18216)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-[Akash Gupta](https://github.com/Guppy16), [Ivaxi Sheth](https://ivaxi0s.github.io/), [Vyas Raina](https://scholar.google.com/citations?hl=en&user=BxFBCoYAAAAJ&view_op=list_works), [Mark Gales](https://mi.eng.cam.ac.uk/~mjfg/), [Mario Fritz](https://cispa.saarland/group/fritz/)
+This is the codebase of the paper: ["LLM Task Interference: An Initial Study on the Impact of Task-Switch in Conversational History"](https://arxiv.org/abs/2402.18216)
+Authors: [Akash Gupta](https://github.com/Guppy16), [Ivaxi Sheth](https://ivaxi0s.github.io/), [Vyas Raina](https://scholar.google.com/citations?hl=en&user=BxFBCoYAAAAJ&view_op=list_works), [Mark Gales](https://mi.eng.cam.ac.uk/~mjfg/), [Mario Fritz](https://cispa.saarland/group/fritz/)
 
 
 **Motivation**
@@ -194,5 +196,3 @@ If you use Task-Switch, or scripts provided in this repository (eg., evaluation 
   year={2024}
 }
 ```
-
-**Arxiv pre-print**: <https://arxiv.org/abs/2402.18216>
